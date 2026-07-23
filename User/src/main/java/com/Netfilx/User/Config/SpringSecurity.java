@@ -42,6 +42,7 @@ public class SpringSecurity {
 
                 // 2. Disable CSRF for stateless REST APIs
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.disable())
 
                 // 3. Configure Authorizations
                 .authorizeHttpRequests(auth -> auth
@@ -78,15 +79,13 @@ public class SpringSecurity {
     }
 
     // 4. Define CORS Bean to allow requests from React Vite (Port 5173)
+    // 4. Define CORS Bean to allow requests from any IP on local network
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow both direct frontend and API Gateway origins
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:8000"
-        ));
+        // 💡 CHANGED: Allows localhost, IP addresses (192.168.x.x), and mobile devices
+        configuration.setAllowedOriginPatterns(List.of("*"));
 
         // Allowed HTTP Methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));

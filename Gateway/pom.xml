@@ -40,6 +40,18 @@
 			<artifactId>spring-cloud-starter-loadbalancer</artifactId>
 		</dependency>
 
+		<!-- 4. Netty DNS Resolver (for macOS) -->
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-resolver-dns-native-macos</artifactId>
+			<version>4.1.112.Final</version>
+			<classifier>osx-aarch_64</classifier> <!-- 👈 Added underscore in aarch_64 -->
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
 		<!-- Testing -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

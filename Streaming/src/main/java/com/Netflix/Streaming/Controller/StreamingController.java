@@ -5,10 +5,12 @@ import com.Netflix.Streaming.DTO.Response.WatchProgressResponse;
 import com.Netflix.Streaming.Service.StreamingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +22,29 @@ public class StreamingController {
 
     private final StreamingService streamingService;
 
+    @GetMapping("/hls/{titleFolder}/{file}")
+    public ResponseEntity<Resource> streamHls(
+            @PathVariable String titleFolder,
+            @PathVariable String file) throws FileNotFoundException {
+
+        Resource resource = streamingService.loadHlsResource(titleFolder, file);
+
+        HttpHeaders headers = new HttpHeaders();
+
+        // 💡 Set the specific MIME type required for HLS playback
+        if (file.endsWith(".m3u8")) {
+            headers.setContentType(MediaType.parseMediaType("application/x-mpegURL"));
+        } else if (file.endsWith(".ts")) {
+            headers.setContentType(MediaType.parseMediaType("video/mp2t"));
+        } else {
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        }
+
+        // Return standard 200 OK with the full small file
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(resource);
+    }
     /**
      * Serves video files using HTTP 206 Partial Content for HTML5 player seeking.
      */

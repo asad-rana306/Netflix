@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +31,22 @@ public class StreamingService {
 
     @Value("${app.video.storage-path}")
     private String videoStoragePath;
+    @Value("${app.video.storage-path}")
+    private String videoStoragePath2;
+
+    /**
+     * Loads HLS manifest (.m3u8) or video segment (.ts) files from disk.
+     */
+    public Resource loadHlsResource(String titleFolder, String fileName) throws FileNotFoundException {
+        // Safe path joining: /Users/.../netflix-media/{titleFolder}/{fileName}
+        File file = Path.of(videoStoragePath2, titleFolder, fileName).toFile();
+
+        if (!file.exists() || !file.isFile()) {
+            throw new FileNotFoundException("HLS resource not found at: " + file.getAbsolutePath());
+        }
+
+        return new FileSystemResource(file);
+    }
 
     /**
      * Constructs a chunked ResourceRegion for HTTP 206 Partial Content Streaming.

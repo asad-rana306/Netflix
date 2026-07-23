@@ -14,10 +14,8 @@ spring:
       ddl-auto: update
     show-sql: true
 
-# 📁 LOCAL DISK VIDEO STORAGE CONFIGURATION
 app:
   video:
-    # IMPORTANT: Must use absolute path and end with a trailing slash "/"
     storage-path: /Users/anandkamath/Documents/netflix-media/
 
 eureka:
