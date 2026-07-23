@@ -56,7 +56,8 @@ public class CatalogService {
                 title.getThumbnailUrl(),
                 title.getHlsMasterUrl(),
                 title.getReleaseYear(),
-                title.getGenres().stream().map(Genre::getName).collect(Collectors.toSet())
+                title.getGenres().stream().map(Genre::getName).collect(Collectors.toSet()),
+                title.getPreviewUrl()
         );
     }
 }

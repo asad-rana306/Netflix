@@ -13,5 +13,6 @@ public record TitleResponse(
         String thumbnailUrl,
         String hlsMasterUrl,
         Integer releaseYear,
-        Set<String> genres
+        Set<String> genres,
+        String previewUrl
 ) {}

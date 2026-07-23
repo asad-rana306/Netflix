@@ -6,7 +6,9 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      # 1. FIX: Ensures preflight (OPTIONS) requests pass through WebFlux handler mappings
       globalcors:
+        add-to-simple-url-handler-mapping: true
         cors-configurations:
           '[/**]':
             allowedOrigins: "http://localhost:5173"
@@ -19,18 +21,28 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
 
+      # 2. FIX: Deduplicates headers in case downstream services (like user-service) ALSO send CORS headers
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+
       routes:
-        # Route 1: User Service (Routed via Eureka logical name)
+        # Route 1: User Service
         - id: user-service
           uri: lb://USER-SERVICE
           predicates:
             - Path=/public/**, /api/v1/profiles/**
 
-        # Route 2: Catalog Service (Routed via Eureka logical name)
+        # Route 2: Catalog Service
         - id: catalog-service
           uri: lb://CATALOG-SERVICE
           predicates:
             - Path=/api/v1/catalog/**
+
+        # Route 3: Streaming Service (NEW)
+        - id: streaming-service
+          uri: lb://STREAMING-SERVICE
+          predicates:
+            - Path=/api/v1/stream/**
 
 eureka:
   client:

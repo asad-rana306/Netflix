@@ -82,19 +82,22 @@ public class SpringSecurity {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Frontend Origin
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        // Allow both direct frontend and API Gateway origins
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:8000"
+        ));
 
         // Allowed HTTP Methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
 
-        // Allowed Headers (Authorization, Content-Type, etc.)
+        // Allowed Headers
         configuration.setAllowedHeaders(List.of("*"));
 
         // Allow Credentials / Bearer Tokens
         configuration.setAllowCredentials(true);
 
-        // Cache preflight request for 1 hour
+        // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

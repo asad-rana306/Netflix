@@ -1,3 +1,28 @@
+server:
+  port: 8083
+
 spring:
   application:
-    name: Streaming
+    name: streaming-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/netflix_streaming_db
+    username: postgres
+    password: postgres123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+# 📁 LOCAL DISK VIDEO STORAGE CONFIGURATION
+app:
+  video:
+    # IMPORTANT: Must use absolute path and end with a trailing slash "/"
+    storage-path: /Users/anandkamath/Documents/netflix-media/
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true

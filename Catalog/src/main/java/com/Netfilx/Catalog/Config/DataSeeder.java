@@ -22,7 +22,6 @@ public class DataSeeder implements CommandLineRunner {
     private final GenreRepository genreRepository;
     private final TitleRepository titleRepository;
 
-    // Public test HLS streams for video playback testing
     private static final String SAMPLE_HLS_1 = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
     private static final String SAMPLE_HLS_2 = "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8";
 
@@ -43,7 +42,30 @@ public class DataSeeder implements CommandLineRunner {
         Genre comedy = genreRepository.save(Genre.builder().name("Comedy").build());
         Genre animation = genreRepository.save(Genre.builder().name("Animation").build());
 
-        // 2. Create Sample Movies
+        // 2. Local Video Titles (Streaming Service)
+        Title title1 = Title.builder()
+                .title("Local Action Thriller")
+                .description("Streamed directly from your local disk using Spring Byte-Range Streaming.")
+                .type("MOVIE")
+                .maturityRating("TV-MA")
+                .releaseYear(2026)
+                .thumbnailUrl("https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample1.mp4")
+                .genres(Set.of(action, sciFi))
+                .build();
+
+        Title title2 = Title.builder()
+                .title("Local Sci-Fi Adventure")
+                .description("High bit-rate local video playback via Gateway route.")
+                .type("MOVIE")
+                .maturityRating("TV-14")
+                .releaseYear(2025)
+                .thumbnailUrl("https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample2.mp4")
+                .genres(Set.of(sciFi))
+                .build();
+
+        // 3. Remote HLS Sample Movies
         Title tearsOfSteel = Title.builder()
                 .title("Tears of Steel")
                 .description("In a dystopian future, a group of soldiers and scientists gather in Amsterdam to stage a desperate counter-attack against rogue machinery.")
@@ -51,6 +73,7 @@ public class DataSeeder implements CommandLineRunner {
                 .maturityRating("TV-14")
                 .releaseYear(2024)
                 .thumbnailUrl("https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample1.mp4")
                 .hlsMasterUrl(SAMPLE_HLS_2)
                 .genres(Set.of(action, sciFi))
                 .build();
@@ -62,6 +85,7 @@ public class DataSeeder implements CommandLineRunner {
                 .maturityRating("TV-MA")
                 .releaseYear(2025)
                 .thumbnailUrl("https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample2.mp4")
                 .hlsMasterUrl(SAMPLE_HLS_1)
                 .genres(Set.of(sciFi, action))
                 .build();
@@ -73,11 +97,12 @@ public class DataSeeder implements CommandLineRunner {
                 .maturityRating("PG-13")
                 .releaseYear(2026)
                 .thumbnailUrl("https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample1.mp4")
                 .hlsMasterUrl(SAMPLE_HLS_1)
                 .genres(Set.of(animation, sciFi))
                 .build();
 
-        // 3. Create Sample TV Series with Episodes
+        // 4. Sample TV Series
         Title strangerRealms = Title.builder()
                 .title("Stranger Realms")
                 .description("When a young boy vanishes from a small town, a secret laboratory and alternate dimensions unravel a dark conspiracy.")
@@ -85,10 +110,10 @@ public class DataSeeder implements CommandLineRunner {
                 .maturityRating("TV-MA")
                 .releaseYear(2025)
                 .thumbnailUrl("https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80")
+                .previewUrl("http://localhost:8000/api/v1/stream/video/sample2.mp4")
                 .genres(Set.of(drama, sciFi))
                 .build();
 
-        // Add Season 1 Episodes for Stranger Realms
         Episode ep1 = Episode.builder()
                 .title(strangerRealms)
                 .episodeTitle("Chapter One: The Vanishing")
@@ -109,8 +134,8 @@ public class DataSeeder implements CommandLineRunner {
 
         strangerRealms.setEpisodes(List.of(ep1, ep2));
 
-        // Save All Titles
-        titleRepository.saveAll(List.of(tearsOfSteel, cyberPulse, cosmicVoyage, strangerRealms));
+        // 5. Save ALL Titles (Including title1 & title2)
+        titleRepository.saveAll(List.of(title1, title2, tearsOfSteel, cyberPulse, cosmicVoyage, strangerRealms));
 
         log.info("Catalog database seeded successfully with {} titles!", titleRepository.count());
     }

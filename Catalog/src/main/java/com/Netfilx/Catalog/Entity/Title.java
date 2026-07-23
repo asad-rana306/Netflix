@@ -35,6 +35,9 @@ public class Title {
     // Filled directly if type == "MOVIE"
     private String hlsMasterUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String previewUrl;
+
     private Integer releaseYear;
 
     @ManyToMany(fetch = FetchType.LAZY)
