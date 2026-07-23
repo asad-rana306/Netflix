@@ -1,0 +1,38 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+      routes:
+        # Route 1: User Service (Routed via Eureka logical name)
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/public/**, /api/v1/profiles/**
+
+        # Route 2: Catalog Service (Routed via Eureka logical name)
+        - id: catalog-service
+          uri: lb://CATALOG-SERVICE
+          predicates:
+            - Path=/api/v1/catalog/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
