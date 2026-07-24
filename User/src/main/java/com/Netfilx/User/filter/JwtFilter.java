@@ -27,10 +27,13 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // Skip JWT validation for CORS preflight (OPTIONS) requests and public endpoints
+        String path = request.getRequestURI();
+        // 💡 Skip JWT validation for CORS preflight (OPTIONS) and public/auth endpoints
         return "OPTIONS".equalsIgnoreCase(request.getMethod())
-                || request.getServletPath().startsWith("/public/");
+                || path.startsWith("/public/")
+                || path.startsWith("/api/v1/auth/");
     }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {

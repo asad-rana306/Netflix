@@ -4,9 +4,11 @@ import com.Netfilx.User.Entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,11 +16,12 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    // Must be at least 32 characters for HMAC-SHA256
-    private String SECRET_KEY = "TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$VTaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V";
+    // 💡 Inject secret key from application.yml
+    @Value("${jwt.secret}")
+    private String secretKey;
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     public String extractEmail(String token) {
@@ -45,7 +48,6 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
-    // Accepts the User entity to embed both email and userId into the token
     public String generateToken(String email) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, email);

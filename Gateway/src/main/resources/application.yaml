@@ -4,14 +4,21 @@ server:
 spring:
   application:
     name: api-gateway
+
+  # 1. Redis Configuration for Distributed Rate Limiting
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
   cloud:
     gateway:
-      # 1. FIX: Ensures preflight (OPTIONS) requests pass through WebFlux handler mappings
+      # 2. CORS handling for WebFlux / preflight OPTIONS
       globalcors:
         add-to-simple-url-handler-mapping: true
         cors-configurations:
           '[/**]':
-            allowedOriginPatterns: "*"  # 👈 CHANGED: Allows localhost, IP addresses, and mobile devices
+            allowedOriginPatterns: "*"
             allowedMethods:
               - GET
               - POST
@@ -21,28 +28,54 @@ spring:
             allowedHeaders: "*"
             allowCredentials: true
 
-      # 2. FIX: Deduplicates headers in case downstream services (like user-service) ALSO send CORS headers
+      # 3. Deduplicate headers from downstream services
       default-filters:
+        - JwtAuthenticationFilter
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
-        - RemoveResponseHeader=Content-Security-Policy  # 👈 Strips CSP header in dev
+        - RemoveResponseHeader=Content-Security-Policy
+
       routes:
-        # Route 1: User Service
+        # Route 1: User & Auth Service
         - id: user-service
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/public/**, /api/v1/profiles/**
+            - Path=/public/**, /api/v1/auth/**, /api/v1/users/**, /api/v1/profiles/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@ipKeyResolver}"
 
         # Route 2: Catalog Service
         - id: catalog-service
           uri: lb://CATALOG-SERVICE
           predicates:
-            - Path=/api/v1/catalog/**
+            - Path=/api/v1/catalog/**, /api/v1/titles/**
 
         # Route 3: Streaming Service
         - id: streaming-service
           uri: lb://STREAMING-SERVICE
           predicates:
-            - Path=/api/v1/stream/**
+            - Path=/api/v1/stream/**, /api/v1/progress/**
+
+        - id: payment-service-webhook
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/v1/payments/webhook
+
+        - id: payment-service
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/v1/payments/**
+          filters:
+            - AuthenticationFilter
+
+
+
+# 4. Shared JWT Secret Key (256-bit HMAC key for parsing Access Tokens)
+jwt:
+  secret: TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$VTaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V
 
 eureka:
   client:

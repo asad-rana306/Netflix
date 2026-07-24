@@ -56,7 +56,10 @@ public class SpringSecurity {
                                 "/journal/swagger-ui.html"
                         ).permitAll()
 
-                        // Public Auth Endpoints (Signup, Login, Health)
+                        // 💡 ADDED: Public Auth Endpoints (Signup, Login, Refresh, Password Reset)
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        // Public Endpoints
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/journal/public").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/concerts").permitAll()
@@ -78,25 +81,15 @@ public class SpringSecurity {
         return http.build();
     }
 
-    // 4. Define CORS Bean to allow requests from React Vite (Port 5173)
-    // 4. Define CORS Bean to allow requests from any IP on local network
+    // 4. Define CORS Bean to allow requests from React Vite / Gateway / Local Network
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 💡 CHANGED: Allows localhost, IP addresses (192.168.x.x), and mobile devices
         configuration.setAllowedOriginPatterns(List.of("*"));
-
-        // Allowed HTTP Methods
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-
-        // Allowed Headers
         configuration.setAllowedHeaders(List.of("*"));
-
-        // Allow Credentials / Bearer Tokens
         configuration.setAllowCredentials(true);
-
-        // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
