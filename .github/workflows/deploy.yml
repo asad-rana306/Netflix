@@ -41,8 +41,14 @@ jobs:
             echo ">>> Cleaning up old Docker build cache..."
             docker system prune -f
 
-            echo ">>> Building microservices sequentially to save RAM..."
-            docker compose build --parallel=2
+            echo ">>> Building microservices strictly one by one..."
+            docker compose build eureka-server
+            docker compose build user-service
+            docker compose build catalog-service
+            docker compose build streaming-service
+            docker compose build payment-service
+            docker compose build notification-service
+            docker compose build gateway-service
 
             echo ">>> Launching containers..."
             docker compose down
