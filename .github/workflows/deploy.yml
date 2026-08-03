@@ -1,0 +1,41 @@
+name: Deploy Netflix Microservices to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USERNAME }}
+          key: ${{ secrets.AWS_EC2_SSH_KEY }}
+          script: |
+            set -e
+            echo ">>> Navigating to project directory..."
+            cd ~/netfilx
+
+            echo ">>> Pulling latest code from main branch..."
+            git fetch --all
+            git reset --hard origin/main
+
+            echo ">>> Injecting production secrets..."
+            cat << 'EOF' > .env
+            ${{ secrets.PROD_ENV_FILE }}
+            EOF
+
+            echo ">>> Rebuilding and starting Docker Compose containers..."
+            docker compose down
+            docker compose up --build -d
+
+            echo ">>> Deployment Complete! Active containers:"
+            docker compose ps
