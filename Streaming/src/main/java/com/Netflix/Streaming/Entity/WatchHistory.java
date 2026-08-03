@@ -1,6 +1,5 @@
 package com.Netflix.Streaming.Entity;
 
-
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -11,6 +10,13 @@ import java.util.UUID;
         name = "watch_history",
         indexes = {
                 @Index(name = "idx_profile_title", columnList = "profile_id, title_id")
+        },
+        // ⚡ ADD THIS: Prevents PostgreSQL from ever allowing duplicate rows for the same watch item
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_profile_title_episode",
+                        columnNames = {"profile_id", "title_id", "episode_id"}
+                )
         }
 )
 @Getter
@@ -24,13 +30,14 @@ public class WatchHistory {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
+    @Column(name = "profile_id", nullable = false)
     private UUID profileId;
 
-    @Column(nullable = false)
-    private Long titleId;
+    @Column(name = "title_id", nullable = false)
+    private UUID titleId;
 
-    private Long episodeId; // Null for movies
+    @Column(name = "episode_id")
+    private UUID episodeId; // Null for movies
 
     @Column(nullable = false)
     private Long progressSeconds;

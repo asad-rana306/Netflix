@@ -3,9 +3,9 @@ package com.Netflix.payment_service.Service;
 import com.Netflix.payment_service.DTO.CheckoutRequest;
 import com.Netflix.payment_service.DTO.CheckoutResponse;
 import com.Netflix.payment_service.DTO.PaymentEvent;
+import com.Netflix.payment_service.DTO.SubscriptionStatusResponse;
 import com.Netflix.payment_service.Entity.Subscription;
 import com.Netflix.payment_service.Repository.SubscriptionRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stripe.Stripe;
 import com.stripe.exception.EventDataObjectDeserializationException;
@@ -15,7 +15,6 @@ import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.Invoice;
 import com.stripe.model.checkout.Session;
-import com.stripe.net.ApiResource;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
@@ -53,6 +52,13 @@ public class PaymentService {
     @Value("${stripe.cancel-url}")
     private String cancelUrl;
 
+    // Optional price ID mappings from application.yml (fallbacks if raw priceId is not a Stripe price_ ID)
+    @Value("${stripe.prices.standard:}")
+    private String standardPriceId;
+
+    @Value("${stripe.prices.premium:}")
+    private String premiumPriceId;
+
     private static final String TOPIC_PAYMENT_EVENTS = "payment-events";
     private static final String REDIS_SUB_KEY_PREFIX = "user:";
 
@@ -62,23 +68,28 @@ public class PaymentService {
     }
 
     public CheckoutResponse createCheckoutSession(String userId, String userEmail, CheckoutRequest request) throws StripeException {
-        SessionCreateParams params = SessionCreateParams.builder()
+        String resolvedPriceId = resolvePriceId(request.priceId(), request.planTier());
+
+        SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-                .setCustomerEmail(userEmail)
                 .setSuccessUrl(successUrl)
                 .setCancelUrl(cancelUrl)
                 .putMetadata("userId", userId)
-                .putMetadata("planTier", request.planTier())
+                .putMetadata("userEmail", userEmail != null ? userEmail : "")
+                .putMetadata("planTier", request.planTier() != null ? request.planTier() : "PREMIUM")
                 .addLineItem(
                         SessionCreateParams.LineItem.builder()
-                                .setPrice(request.priceId())
+                                .setPrice(resolvedPriceId)
                                 .setQuantity(1L)
                                 .build()
-                )
-                .build();
+                );
 
-        Session session = Session.create(params);
-        log.info(">>> Created Checkout Session ID: {} for userId: {}", session.getId(), userId);
+        if (userEmail != null && !userEmail.isBlank()) {
+            paramsBuilder.setCustomerEmail(userEmail);
+        }
+
+        Session session = Session.create(paramsBuilder.build());
+        log.info(">>> Created Checkout Session ID: {} for userId: {} (Price: {})", session.getId(), userId, resolvedPriceId);
         return new CheckoutResponse(session.getUrl(), session.getId());
     }
 
@@ -90,19 +101,7 @@ public class PaymentService {
         try {
             switch (event.getType()) {
                 case "checkout.session.completed" -> {
-                    log.info(">>> Processing checkout.session.completed...");
-
-                    // Safely extract Stripe Session object using SDK deserializer
-                    EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
-                    Session session = null;
-
-                    if (dataObjectDeserializer.getObject().isPresent() && dataObjectDeserializer.getObject().get() instanceof Session) {
-                        session = (Session) dataObjectDeserializer.getObject().get();
-                    } else {
-                        // Fallback for API version mismatches
-                        session = (Session) dataObjectDeserializer.deserializeUnsafe();
-                    }
-
+                    Session session = deserializeEventObject(event, Session.class);
                     if (session != null) {
                         processCheckoutSuccess(session);
                     } else {
@@ -110,66 +109,45 @@ public class PaymentService {
                     }
                 }
                 case "invoice.payment_succeeded" -> {
-                    EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
-                    Invoice invoice = (Invoice) dataObjectDeserializer.getObject()
-                            .orElseGet(() -> {
-                                try {
-                                    return (Invoice) dataObjectDeserializer.deserializeUnsafe();
-                                } catch (EventDataObjectDeserializationException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            });
+                    Invoice invoice = deserializeEventObject(event, Invoice.class);
                     if (invoice != null) processInvoicePaymentSucceeded(invoice);
                 }
                 case "invoice.payment_failed" -> {
-                    EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
-                    Invoice invoice = (Invoice) dataObjectDeserializer.getObject()
-                            .orElseGet(() -> {
-                                try {
-                                    return (Invoice) dataObjectDeserializer.deserializeUnsafe();
-                                } catch (EventDataObjectDeserializationException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            });
+                    Invoice invoice = deserializeEventObject(event, Invoice.class);
                     if (invoice != null) processInvoicePaymentFailed(invoice);
                 }
                 case "customer.subscription.deleted" -> {
-                    EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
-                    com.stripe.model.Subscription sub = (com.stripe.model.Subscription) dataObjectDeserializer.getObject()
-                            .orElseGet(() -> {
-                                try {
-                                    return (com.stripe.model.Subscription) dataObjectDeserializer.deserializeUnsafe();
-                                } catch (EventDataObjectDeserializationException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            });
+                    com.stripe.model.Subscription sub = deserializeEventObject(event, com.stripe.model.Subscription.class);
                     if (sub != null) processSubscriptionCanceled(sub);
                 }
                 default -> log.info(">>> Unhandled event type ignored: {}", event.getType());
             }
         } catch (Exception e) {
             log.error(">>> Error processing webhook event {}: {}", event.getType(), e.getMessage(), e);
-            // Do not throw exception back to Stripe so it doesn't return 500
         }
     }
 
     private void processCheckoutSuccess(Session session) {
         log.info(">>> Inside processCheckoutSuccess for Session ID: {}", session.getId());
 
-        // 1. Safely extract metadata with NULL guards
         String userId = null;
+        String userEmail = null;
         String planTier = "PREMIUM";
 
         if (session != null && session.getMetadata() != null) {
             userId = session.getMetadata().get("userId");
+            userEmail = session.getMetadata().get("userEmail");
             if (session.getMetadata().get("planTier") != null) {
                 planTier = session.getMetadata().get("planTier");
             }
         }
 
-        // 2. Fallback for CLI triggers where metadata is null
+        if (userEmail == null || userEmail.isBlank()) {
+            userEmail = session != null ? session.getCustomerEmail() : null;
+        }
+
         if (userId == null || userId.isBlank()) {
-            userId = "3"; // Fallback test user ID
+            userId = "3"; // Fallback test user ID for direct CLI triggers
             log.warn(">>> Metadata userId was empty! Using fallback userId: {}", userId);
         }
 
@@ -181,7 +159,6 @@ public class PaymentService {
 
         log.info(">>> Persisting Subscription -> userId: {}, customerId: {}", userId, stripeCustomerId);
 
-        // 3. Save to PostgreSQL
         final String finalUserId = userId;
         Subscription subscription = subscriptionRepository.findByUserId(finalUserId)
                 .orElseGet(() -> Subscription.builder()
@@ -198,8 +175,6 @@ public class PaymentService {
         Subscription saved = subscriptionRepository.save(subscription);
         log.info(">>> SUCCESS! Saved Subscription ID: {} to PostgreSQL!", saved.getId());
 
-        // 4. Wrap Redis and Kafka in individual try-catch blocks
-        // (So if Redis/Kafka are offline, PostgreSQL still saves!)
         try {
             cacheSubscriptionInRedis(finalUserId, "ACTIVE_" + planTier);
         } catch (Exception e) {
@@ -207,7 +182,7 @@ public class PaymentService {
         }
 
         try {
-            publishPaymentEvent(finalUserId, stripeCustomerId, "ACTIVE", planTier, "PAYMENT_SUCCEEDED");
+            publishPaymentEvent(finalUserId, userEmail, stripeCustomerId, "ACTIVE", planTier, "PAYMENT_SUCCEEDED");
         } catch (Exception e) {
             log.warn(">>> Kafka skipped: {}", e.getMessage());
         }
@@ -220,6 +195,10 @@ public class PaymentService {
             sub.setUpdatedAt(LocalDateTime.now());
             subscriptionRepository.save(sub);
             log.info(">>> Updated subscription to ACTIVE for customer: {}", stripeCustomerId);
+
+            try {
+                publishPaymentEvent(sub.getUserId(), invoice.getCustomerEmail(), stripeCustomerId, "ACTIVE", sub.getPlanTier(), "INVOICE_PAYMENT_SUCCEEDED");
+            } catch (Exception ignored) {}
         });
     }
 
@@ -230,6 +209,10 @@ public class PaymentService {
             sub.setUpdatedAt(LocalDateTime.now());
             subscriptionRepository.save(sub);
             log.info(">>> Updated subscription to PAST_DUE for customer: {}", stripeCustomerId);
+
+            try {
+                publishPaymentEvent(sub.getUserId(), invoice.getCustomerEmail(), stripeCustomerId, "PAST_DUE", sub.getPlanTier(), "PAYMENT_FAILED");
+            } catch (Exception ignored) {}
         });
     }
 
@@ -250,8 +233,51 @@ public class PaymentService {
         redisTemplate.opsForValue().set(key, state, 30, TimeUnit.DAYS);
     }
 
-    private void publishPaymentEvent(String userId, String stripeCustomerId, String status, String planTier, String eventType) {
+    private void publishPaymentEvent(String userId, String userEmail, String stripeCustomerId, String status, String planTier, String eventType) {
         PaymentEvent event = new PaymentEvent(userId, stripeCustomerId, status, planTier, eventType, Instant.now());
         kafkaTemplate.send(TOPIC_PAYMENT_EVENTS, userId, event);
+    }
+
+    /**
+     * Resolves raw input strings (e.g., 'price_premium_4k' or 'PREMIUM') into valid Stripe Price IDs (price_1...).
+     */
+    private String resolvePriceId(String rawPriceId, String planTier) {
+        if (rawPriceId != null && rawPriceId.startsWith("price_1")) {
+            return rawPriceId;
+        }
+        if ("PREMIUM".equalsIgnoreCase(planTier) && premiumPriceId != null && !premiumPriceId.isBlank()) {
+            return premiumPriceId;
+        }
+        if (standardPriceId != null && !standardPriceId.isBlank()) {
+            return standardPriceId;
+        }
+        return rawPriceId;
+    }
+
+    /**
+     * Reusable helper for safe object deserialization from Stripe Webhook Event wrappers.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T deserializeEventObject(Event event, Class<T> clazz) {
+        EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
+        if (deserializer.getObject().isPresent() && clazz.isInstance(deserializer.getObject().get())) {
+            return (T) deserializer.getObject().get();
+        }
+        try {
+            return (T) deserializer.deserializeUnsafe();
+        } catch (EventDataObjectDeserializationException e) {
+            log.error(">>> Failed to deserialize {} from event: {}", clazz.getSimpleName(), e.getMessage());
+            return null;
+        }
+    }
+    public SubscriptionStatusResponse getSubscriptionStatus(String userId) {
+        return subscriptionRepository.findByUserId(userId)
+                .map(sub -> new SubscriptionStatusResponse(
+                        sub.getStatus() == Subscription.SubscriptionStatus.ACTIVE,
+                        sub.getPlanTier(),
+                        sub.getStatus().name(),
+                        sub.getCurrentPeriodEnd() != null ? sub.getCurrentPeriodEnd().toString() : null
+                ))
+                .orElse(new SubscriptionStatusResponse(false, "NONE", "INACTIVE", null));
     }
 }

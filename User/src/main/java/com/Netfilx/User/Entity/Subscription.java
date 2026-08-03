@@ -20,9 +20,9 @@ public class Subscription {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
-    private String planTier = "STANDARD";
+    private String planTier;
 
-    private String status = "ACTIVE";
+    private String status = "INACTIVE";
 
     private LocalDateTime currentPeriodStart;
     private LocalDateTime currentPeriodEnd;
@@ -30,4 +30,6 @@ public class Subscription {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    private String StripeCustomerId;
 }

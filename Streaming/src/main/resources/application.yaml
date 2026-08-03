@@ -4,19 +4,57 @@ server:
 spring:
   application:
     name: streaming-service
+
+  # ⚡ 1. ENABLE JAVA 21 VIRTUAL THREADS
+  threads:
+    virtual:
+      enabled: true
+
+  # 🛑 DISABLE KAFKA FOR CURRENT LOAD TESTING
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+  # 2. ALLOW LARGE VIDEO UPLOADS (Up to 10GB)
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10GB
+      max-request-size: 10GB
+
+  # 3. DATABASE CONFIGURATION (Pointed to PgBouncer)
   datasource:
-    url: jdbc:postgresql://localhost:5432/netflix_streaming_db
+    # ⚡ POINT TO PGBOUNCER (Port 6432 instead of raw PostgreSQL 5432)
+    url: jdbc:postgresql://localhost:6432/netflix_streaming_db
     username: postgres
     password: postgres123
     driver-class-name: org.postgresql.Driver
+
+    # ⚡ HIKARICP OPTIMIZATION FOR 5,000+ CONCURRENT USERS
+    hikari:
+      maximum-pool-size: 50             # Expanded from default 10 to 50
+      minimum-idle: 10                  # Warm connections ready
+      idle-timeout: 30000               # 30 seconds
+      max-lifetime: 1800000             # 30 minutes
+      connection-timeout: 10000         # Fail fast after 10s if pool is saturated
+      pool-name: StreamingHikariPool
+
   jpa:
     hibernate:
+      # ⚠️ CHANGED TO 'update' - 'create' wipes your tables and unique constraints on every boot!
       ddl-auto: update
-    show-sql: true
+    show-sql: false
+
+#  data:
+#    redis:
+#      host: localhost
+#      port: 6379
 
 app:
   video:
     storage-path: /Users/anandkamath/Documents/netflix-media/
+    temp-path: /Users/anandkamath/Documents/netflix-media/temp/
+    ffmpeg-path: /opt/homebrew/bin/ffmpeg
 
 eureka:
   client:
@@ -24,3 +62,8 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+logging:
+  level:
+    org.apache.kafka: OFF
+    org.springframework.kafka: OFF

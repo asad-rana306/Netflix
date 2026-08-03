@@ -2,6 +2,7 @@ package com.Netflix.payment_service.Controller;
 
 import com.Netflix.payment_service.DTO.CheckoutRequest;
 import com.Netflix.payment_service.DTO.CheckoutResponse;
+import com.Netflix.payment_service.DTO.SubscriptionStatusResponse;
 import com.Netflix.payment_service.Service.PaymentService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
@@ -48,5 +49,10 @@ public class PaymentController {
             log.error("Error processing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook handling error");
         }
+    }
+    @GetMapping("/status")
+    public ResponseEntity<SubscriptionStatusResponse> getSubscriptionStatus(
+            @RequestHeader("X-User-Id") String userId) {
+        return ResponseEntity.ok(paymentService.getSubscriptionStatus(userId));
     }
 }

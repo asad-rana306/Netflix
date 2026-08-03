@@ -26,7 +26,7 @@ public class User {
     private String passwordHash;
 
     @Column(nullable = false)
-    private String status = "ACTIVE";
+    private String status;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Profile> profiles = new ArrayList<>();

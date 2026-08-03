@@ -10,8 +10,8 @@ import java.util.UUID;
 public class WatchProgressResponse {
     private UUID id;
     private UUID profileId;
-    private Long titleId;
-    private Long episodeId;
+    private UUID titleId;
+    private UUID episodeId;
     private Long progressSeconds;
     private Long durationSeconds;
     private boolean isCompleted;

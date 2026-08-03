@@ -11,9 +11,9 @@ public class ProgressUpdateRequest {
     private UUID profileId;
 
     @NotNull
-    private Long titleId;
+    private UUID titleId;
 
-    private Long episodeId;
+    private UUID episodeId;
 
     @NotNull
     private Long progressSeconds;

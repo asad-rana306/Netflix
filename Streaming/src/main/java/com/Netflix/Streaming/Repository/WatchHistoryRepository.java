@@ -11,9 +11,10 @@ import java.util.UUID;
 @Repository
 public interface WatchHistoryRepository extends JpaRepository<WatchHistory, UUID> {
 
-    Optional<WatchHistory> findByProfileIdAndTitleIdAndEpisodeId(UUID profileId, Long titleId, Long episodeId);
+    // ⚡ CHANGED to findFirstBy to safely handle edge-case duplicate matches
+    Optional<WatchHistory> findFirstByProfileIdAndTitleIdAndEpisodeId(UUID profileId, UUID titleId, UUID episodeId);
 
-    Optional<WatchHistory> findByProfileIdAndTitleIdAndEpisodeIdIsNull(UUID profileId, Long titleId);
+    Optional<WatchHistory> findFirstByProfileIdAndTitleIdAndEpisodeIdIsNull(UUID profileId, UUID titleId);
 
     // Fetch items that are partially watched (Continue Watching row)
     List<WatchHistory> findByProfileIdAndIsCompletedFalseOrderByLastWatchedAtDesc(UUID profileId);

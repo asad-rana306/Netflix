@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Warning</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #141414; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #FFFFFF;">
+<table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #181818; margin: 40px auto; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+    <tr>
+        <td style="padding: 30px 40px; background-color: #000000;">
+            <h1 style="color: #E50914; margin: 0; font-size: 28px; font-weight: bold; letter-spacing: 1px;">NETFLIX</h1>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 40px;">
+            <h2 style="font-size: 20px; margin-top: 0; color: #E50914;">Action Required: Payment Unsuccessful</h2>
+            <p style="font-size: 15px; line-height: 1.6; color: #CCCCCC;">
+                Hi <span th:text="${userName}">Member</span>, we were unable to process your recent payment of <strong style="color: #FFFFFF;" th:text="${currency + ' ' + amount}">USD 15.99</strong>.
+            </p>
+            <div style="background-color: #2A1515; border-left: 4px solid #E50914; padding: 15px; margin: 20px 0; border-radius: 0 4px 4px 0;">
+                <p style="margin: 0; font-size: 14px; color: #FF8888;">Reason: <span th:text="${failureReason}">Card declined</span></p>
+            </div>
+            <p style="font-size: 14px; color: #CCCCCC;">
+                Please update your payment method to ensure uninterrupted access to your streaming service.
+            </p>
+            <div style="text-align: center; margin: 35px 0;">
+                <a th:href="${retryPaymentUrl}" style="background-color: #E50914; color: #FFFFFF; text-decoration: none; padding: 14px 28px; font-weight: bold; border-radius: 4px; font-size: 15px; display: inline-block;">Update Payment Method</a>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 20px 40px; background-color: #101010; text-align: center; border-top: 1px solid #222222;">
+            <p style="font-size: 11px; color: #666666; margin: 0;">Netflix Billing Support</p>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

@@ -31,15 +31,13 @@ public class StreamingService {
 
     @Value("${app.video.storage-path}")
     private String videoStoragePath;
-    @Value("${app.video.storage-path}")
-    private String videoStoragePath2;
 
     /**
      * Loads HLS manifest (.m3u8) or video segment (.ts) files from disk.
      */
     public Resource loadHlsResource(String titleFolder, String fileName) throws FileNotFoundException {
         // Safe path joining: /Users/.../netflix-media/{titleFolder}/{fileName}
-        File file = Path.of(videoStoragePath2, titleFolder, fileName).toFile();
+        File file = Path.of(videoStoragePath, titleFolder, fileName).toFile();
 
         if (!file.exists() || !file.isFile()) {
             throw new FileNotFoundException("HLS resource not found at: " + file.getAbsolutePath());
@@ -52,7 +50,7 @@ public class StreamingService {
      * Constructs a chunked ResourceRegion for HTTP 206 Partial Content Streaming.
      */
     public ResourceRegion prepareVideoRegion(String fileName, HttpRange range) throws IOException {
-        File file = new File(videoStoragePath + fileName);
+        File file = Path.of(videoStoragePath, fileName).toFile();
         if (!file.exists()) {
             throw new IllegalArgumentException("Video file not found: " + fileName);
         }
@@ -77,9 +75,10 @@ public class StreamingService {
      */
     @Transactional
     public WatchProgressResponse updateProgress(ProgressUpdateRequest req) {
+        // ⚡ UPDATED: Uses findFirstBy... to safely grab the existing entry
         Optional<WatchHistory> existing = (req.getEpisodeId() != null)
-                ? watchHistoryRepository.findByProfileIdAndTitleIdAndEpisodeId(req.getProfileId(), req.getTitleId(), req.getEpisodeId())
-                : watchHistoryRepository.findByProfileIdAndTitleIdAndEpisodeIdIsNull(req.getProfileId(), req.getTitleId());
+                ? watchHistoryRepository.findFirstByProfileIdAndTitleIdAndEpisodeId(req.getProfileId(), req.getTitleId(), req.getEpisodeId())
+                : watchHistoryRepository.findFirstByProfileIdAndTitleIdAndEpisodeIdIsNull(req.getProfileId(), req.getTitleId());
 
         WatchHistory history = existing.orElseGet(() -> WatchHistory.builder()
                 .profileId(req.getProfileId())

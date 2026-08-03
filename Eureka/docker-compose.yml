@@ -1,0 +1,7 @@
+services:
+  eureka:
+    build: .
+    ports:
+      - "8761:8761"
+    restart: unless-stopped
+

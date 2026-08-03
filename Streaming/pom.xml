@@ -23,7 +23,7 @@
 	</properties>
 
 	<dependencies>
-		<!-- 1. Eureka Client (Corrected from eureka-server) -->
+		<!-- 1. Eureka Client -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
@@ -41,6 +41,24 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- 2. Redis Caching (For Cache-Aside Subscription Shield) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<!-- 3. Kafka (For Payment Event Listening & Cache Invalidation) -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- 4. Feign Client (For Fallback REST calls to PAYMENT-SERVICE) -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
 		</dependency>
 
 		<!-- Database & Lombok -->

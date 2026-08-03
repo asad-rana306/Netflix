@@ -42,4 +42,6 @@ public class Profile {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+    private String preferredGenre = "Action";
+
 }

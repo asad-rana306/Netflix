@@ -23,13 +23,13 @@
 	</properties>
 
 	<dependencies>
-		<!-- 1. Eureka Discovery Client (REQUIRED FOR EUREKA) -->
+		<!-- Eureka Discovery Client -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>
 
-		<!-- 1. Spring Data Redis for Session & Refresh Token Management -->
+		<!-- Spring Data Redis for Session & Refresh Token Management -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
@@ -39,11 +39,13 @@
 			<groupId>com.fasterxml.jackson.datatype</groupId>
 			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
-		<!-- 2. Spring Kafka for Async Domain Events -->
+
+		<!-- Spring Kafka for Async Domain Events -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
 		</dependency>
+
 		<!-- Spring Boot Core Starters -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -81,17 +83,10 @@
 		</dependency>
 
 		<!-- Swagger / OpenAPI Documentation -->
-		<!-- Correct Swagger/OpenAPI version for Spring Boot 3.x -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.6.0</version>
-		</dependency>
-
-		<!-- Standard Spring Boot Web Starter -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
 		<!-- Database & Tooling -->
@@ -120,7 +115,7 @@
 		</dependency>
 	</dependencies>
 
-	<!-- 2. Spring Cloud Dependency Management BOM (REQUIRED FOR EUREKA) -->
+	<!-- Spring Cloud Dependency Management BOM -->
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -145,6 +140,21 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+
+			<!-- Compiler plugin with explicit Lombok Annotation Processor for Java 21 -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
 		</plugins>

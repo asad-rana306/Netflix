@@ -2,14 +2,19 @@ package com.Netflix.Streaming.Controller;
 
 import com.Netflix.Streaming.DTO.Request.ProgressUpdateRequest;
 import com.Netflix.Streaming.DTO.Response.WatchProgressResponse;
+import com.Netflix.Streaming.Service.HlsTranscoderService;
+import com.Netflix.Streaming.Service.StreamAccessService; // 👈 Added
 import com.Netflix.Streaming.Service.StreamingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
@@ -21,11 +26,61 @@ import java.util.UUID;
 public class StreamingController {
 
     private final StreamingService streamingService;
+    private final StreamAccessService streamAccessService; // 👈 1. Inject StreamAccessService
+
+    private final HlsTranscoderService hlsTranscoderService;
+
+    @Value("${app.video.temp-path}")
+    private String tempPath;
+
+    /**
+     * Admin Upload Endpoint: Accepts a raw MP4 and triggers background HLS transcoding.
+     * Returns 202 ACCEPTED immediately to prevent gateway timeouts.
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadAndTranscodeVideo(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam("titleFolder") String titleFolder) {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("File cannot be empty.");
+        }
+
+        try {
+            // 1. Create temp directory if it doesn't exist
+            File tempDir = new File(tempPath);
+            if (!tempDir.exists()) {
+                tempDir.mkdirs();
+            }
+
+            // 2. Save raw MP4 file temporarily to disk
+            File tempFile = new File(tempDir, titleFolder + "_" + System.currentTimeMillis() + ".mp4");
+            file.transferTo(tempFile);
+
+            // 3. Trigger Async Transcoding Job (Non-blocking)
+            hlsTranscoderService.transcodeToHlsAsync(tempFile, titleFolder);
+
+            // 4. Return 202 Accepted immediately
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body("Video upload accepted. HLS transcoding in progress for folder: " + titleFolder);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to stage video file for transcoding: " + e.getMessage());
+        }
+    }
 
     @GetMapping("/hls/{titleFolder}/{file}")
-    public ResponseEntity<Resource> streamHls(
+    public ResponseEntity<?> streamHls(
             @PathVariable String titleFolder,
-            @PathVariable String file) throws FileNotFoundException {
+            @PathVariable String file,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) throws FileNotFoundException {
+
+        // 🔒 2. Gatekeeping check for HLS streaming
+        if (!streamAccessService.canUserStream(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access Denied: An active subscription is required to watch this content.");
+        }
 
         Resource resource = streamingService.loadHlsResource(titleFolder, file);
 
@@ -45,13 +100,21 @@ public class StreamingController {
                 .headers(headers)
                 .body(resource);
     }
+
     /**
      * Serves video files using HTTP 206 Partial Content for HTML5 player seeking.
      */
     @GetMapping("/video/{fileName}")
-    public ResponseEntity<ResourceRegion> streamVideo(
+    public ResponseEntity<?> streamVideo(
             @PathVariable String fileName,
-            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) throws IOException {
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) throws IOException {
+
+        // 🔒 3. Gatekeeping check for raw MP4 streaming
+        if (!streamAccessService.canUserStream(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access Denied: An active subscription is required to watch this content.");
+        }
 
         HttpRange range = null;
         if (rangeHeader != null && !rangeHeader.isEmpty()) {

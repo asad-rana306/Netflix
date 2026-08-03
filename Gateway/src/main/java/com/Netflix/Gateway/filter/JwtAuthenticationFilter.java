@@ -1,6 +1,5 @@
 package com.Netflix.Gateway.filter;
 
-
 import com.Netflix.Gateway.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -66,13 +65,30 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 return onError(exchange, "Invalid or Expired JWT Token", HttpStatus.UNAUTHORIZED);
             }
 
-            // 4. Extract claims and propagate context via internal headers downstream
+            // 4. Extract claims and propagate context safely
             Claims claims = jwtUtil.getClaims(token);
-            ServerHttpRequest modifiedRequest = request.mutate()
-                    .header("X-User-Id", claims.getSubject())
-                    .header("X-User-Email", claims.get("email", String.class))
-                    .header("X-User-Plan", claims.get("plan", String.class))
-                    .build();
+
+            // 💡 FIX: Subject is Email. 'userId' and 'plan' come from custom claims map.
+            String email = claims.getSubject();
+            String userId = claims.get("userId", String.class);
+            if (userId == null || userId.isBlank()) {
+                userId = email; // Fallback to email if userId claim wasn't explicitly added
+            }
+            String plan = claims.get("plan", String.class);
+
+            ServerHttpRequest.Builder builder = request.mutate();
+
+            if (email != null) {
+                builder.header("X-User-Email", email);
+            }
+            if (userId != null) {
+                builder.header("X-User-Id", userId);
+            }
+            if (plan != null) {
+                builder.header("X-User-Plan", plan);
+            }
+
+            ServerHttpRequest modifiedRequest = builder.build();
 
             return chain.filter(exchange.mutate().request(modifiedRequest).build());
         };

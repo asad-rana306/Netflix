@@ -31,3 +31,23 @@ build/
 
 ### VS Code ###
 .vscode/
+
+## VS Code ###
+
+### Mac OS ###
+.DS_Store
+
+# Local environment & secret files
+.env
+.env.local
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Build artifacts
+target/
+*.jar
+*.log

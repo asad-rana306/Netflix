@@ -6,6 +6,7 @@ import com.Netfilx.User.DTO.Request.SignupRequest;
 import com.Netfilx.User.DTO.Response.AuthResponse;
 import com.Netfilx.User.Entity.RefreshToken;
 import com.Netfilx.User.Entity.User;
+import com.Netfilx.User.Entity.UserSession;
 import com.Netfilx.User.Event.UserRegisteredEvent;
 import com.Netfilx.User.Service.KafkaProducerService;
 import com.Netfilx.User.Service.RedisSessionService;
@@ -14,9 +15,8 @@ import com.Netfilx.User.Service.UserService;
 import com.Netfilx.User.Utils.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,11 +27,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/public")
+@RequiredArgsConstructor
 public class PublicController {
 
     private final AuthenticationManager authenticationManager;
@@ -41,40 +44,35 @@ public class PublicController {
     private final RedisSessionService redisSessionService;
     private final KafkaProducerService kafkaProducerService;
 
-    @Autowired
-    public PublicController(AuthenticationManager authenticationManager,
-                            JwtUtil jwtUtil,
-                            UserDetailServiceImpl userDetailService,
-                            UserService userService,
-                            RedisSessionService redisSessionService,
-                            KafkaProducerService kafkaProducerService) {
-        this.authenticationManager = authenticationManager;
-        this.jwtUtil = jwtUtil;
-        this.userDetailService = userDetailService;
-        this.userService = userService;
-        this.redisSessionService = redisSessionService;
-        this.kafkaProducerService = kafkaProducerService;
-    }
-
-    @GetMapping
-    public String healthCheck() {
-        return "Ok";
+    /**
+     * Health check endpoint for API Gateway and discovery probes.
+     */
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> healthCheck() {
+        return ResponseEntity.ok(Map.of(
+                "status", "UP",
+                "message", "User Service Public API is operational"
+        ));
     }
 
     /**
-     * Signup: Saves user and emits a UserRegisteredEvent to Kafka
+     * Signup: Registers a new user account and emits a UserRegisteredEvent to Kafka.
      */
     @PostMapping("/signup")
-    public ResponseEntity<String> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<Map<String, Object>> signup(@Valid @RequestBody SignupRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        log.info("REST request to register new user account for email: {}", normalizedEmail);
+
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(request.getPassword()); // userService.saveNewUser will encode this password
+        user.setEmail(normalizedEmail);
+        user.setPasswordHash(request.getPassword()); // Encoded inside userService.saveNewUser
 
         User savedUser = userService.saveNewUser(user);
+        String userIdStr = savedUser.getId() != null ? savedUser.getId().toString() : UUID.randomUUID().toString();
 
-        // Emit asynchronous Kafka event for Notification Service
+        // Emit asynchronous Kafka event for downstream notification service
         UserRegisteredEvent event = UserRegisteredEvent.builder()
-                .userId(savedUser.getId() != null ? savedUser.getId().toString() : UUID.randomUUID().toString())
+                .userId(userIdStr)
                 .email(savedUser.getEmail())
                 .verificationToken(UUID.randomUUID().toString())
                 .createdAt(Instant.now())
@@ -82,78 +80,90 @@ public class PublicController {
 
         kafkaProducerService.sendUserRegisteredEvent(event);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body("User Registered Successfully");
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "success", true,
+                "message", "User registered successfully",
+                "userId", userIdStr
+        ));
     }
 
     /**
-     * Login: Authenticates user, generates Access Token, stores Refresh Token in Redis
+     * Login: Authenticates credentials, generates JWT access token, and stores session in Redis.
      */
-    private static final Logger log = LoggerFactory.getLogger(PublicController.class);
-
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        log.info("REST request to authenticate user: {}", normalizedEmail);
+
         try {
-            // 1. Authenticate credentials against PostgreSQL
+            // 1. Authenticate credentials against Security Manager / Database
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                    new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
             );
-
-            // 2. Load UserDetails and generate short-lived JWT access token
-            UserDetails userDetails = userDetailService.loadUserByUsername(request.getEmail());
-            String accessToken = jwtUtil.generateToken(userDetails.getUsername());
-
-            // 3. Extract request metadata
-            String userAgent = httpRequest.getHeader("User-Agent");
-            String ipAddress = httpRequest.getRemoteAddr();
-            String deviceId = httpRequest.getHeader("X-Device-Id");
-
-            // Fallback for null deviceId to prevent NPE
-            if (deviceId == null || deviceId.isBlank()) {
-                deviceId = UUID.randomUUID().toString();
-            }
-
-            // 4. Create Refresh Token & store session in Redis
-            RefreshToken refreshToken = redisSessionService.createRefreshToken(
-                    userDetails.getUsername(),
-                    request.getEmail(),
-                    deviceId,
-                    userAgent,
-                    ipAddress
-            );
-
-            // 5. Return AuthResponse containing both tokens
-            AuthResponse response = AuthResponse.builder()
-                    .accessToken(accessToken)
-                    .refreshToken(refreshToken.getId())
-                    .email(request.getEmail())
-                    .userId(userDetails.getUsername())
-                    .build();
-
-            return ResponseEntity.ok(response);
-
         } catch (BadCredentialsException e) {
-            log.warn("Authentication failed for email: {}", request.getEmail());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Incorrect email or password");
-        } catch (Exception e) {
-            // 💡 Print real error to console so we can see if Redis/JWT is failing!
-            log.error("Internal error during login for user: {}", request.getEmail(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Internal server error during login: " + e.getMessage());
+            log.warn("Authentication failed: Invalid credentials for email: {}", normalizedEmail);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "message", "Incorrect email or password"
+            ));
         }
+
+        // 2. Fetch persisted User entity to retrieve true database userId
+        User user = userService.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user record not found in database."));
+
+        UserDetails userDetails = userDetailService.loadUserByUsername(normalizedEmail);
+        String accessToken = jwtUtil.generateToken(userDetails.getUsername());
+
+        // 3. Extract request metadata
+        String userAgent = httpRequest.getHeader("User-Agent");
+        String ipAddress = getClientIp(httpRequest);
+        String deviceId = httpRequest.getHeader("X-Device-Id");
+
+        if (deviceId == null || deviceId.isBlank()) {
+            deviceId = UUID.randomUUID().toString();
+        }
+
+        String userIdStr = user.getId() != null ? user.getId().toString() : user.getEmail();
+
+        // 4. Create Refresh Token & store session in Redis
+        RefreshToken refreshToken = redisSessionService.createRefreshToken(
+                userIdStr,
+                user.getEmail(),
+                deviceId,
+                userAgent,
+                ipAddress
+        );
+
+        // 5. Build structured AuthResponse payload
+        AuthResponse response = AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getId())
+                .email(user.getEmail())
+                .userId(userIdStr)
+                .build();
+
+        return ResponseEntity.ok(response);
     }
+
     /**
-     * Refresh: Swaps an old Refresh Token for a new Access + Refresh Token pair
+     * Refresh: Rotates an old Refresh Token for a new Access + Refresh Token pair.
      */
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest request, HttpServletRequest httpRequest) {
+        log.info("REST request to rotate refresh token");
+
         String userAgent = httpRequest.getHeader("User-Agent");
-        String ipAddress = httpRequest.getRemoteAddr();
+        String ipAddress = getClientIp(httpRequest);
 
         Optional<RefreshToken> newRefreshTokenOpt = redisSessionService.verifyAndRotate(
                 request.getRefreshToken(), userAgent, ipAddress);
 
         if (newRefreshTokenOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired Refresh Token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "message", "Invalid or expired Refresh Token"
+            ));
         }
 
         RefreshToken newRefreshToken = newRefreshTokenOpt.get();
@@ -171,29 +181,78 @@ public class PublicController {
     }
 
     /**
-     * Logout: Revokes current device session from Redis
+     * Logout: Revokes current device session from Redis.
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@Valid @RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<Map<String, Object>> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("REST request to revoke active refresh token session");
         redisSessionService.revokeRefreshToken(request.getRefreshToken());
-        return ResponseEntity.ok("Successfully logged out");
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Successfully logged out"
+        ));
     }
 
     /**
-     * Logout All: Revokes all device sessions for a specific user
+     * Logout All: Revokes all device sessions for the authenticated token holder.
      */
     @PostMapping("/logout-all")
-    public ResponseEntity<?> logoutAll(@RequestParam String userId) {
+    public ResponseEntity<Map<String, Object>> logoutAll(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("REST request to revoke all active sessions for token holder");
+
+        // 🔒 SECURITY FIX: Verify incoming refresh token to safely resolve and revoke the owner's sessions
+        Optional<RefreshToken> tokenOpt = redisSessionService.verifyAndRotate(request.getRefreshToken(), null, null);
+
+        if (tokenOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "message", "Invalid or expired Refresh Token"
+            ));
+        }
+
+        String userId = tokenOpt.get().getUserId();
         redisSessionService.revokeAllSessions(userId);
-        return ResponseEntity.ok("Successfully logged out from all devices");
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Successfully logged out from all devices"
+        ));
     }
 
     /**
-     * View Active Device Sessions stored in Redis
+     * View Active Device Sessions stored in Redis for the token holder.
      */
-    @GetMapping("/sessions")
-    public ResponseEntity<List<Object>> getActiveSessions(@RequestParam String userId) {
-        List<Object> sessions = redisSessionService.getActiveSessions(userId);
+    @PostMapping("/sessions")
+    public ResponseEntity<?> getActiveSessions(@Valid @RequestBody RefreshTokenRequest request) {
+        log.debug("REST request to retrieve active sessions");
+
+        // 🔒 SECURITY FIX: Verify token ownership before returning session details
+        Optional<RefreshToken> tokenOpt = redisSessionService.verifyAndRotate(request.getRefreshToken(), null, null);
+
+        if (tokenOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "message", "Invalid or expired Refresh Token"
+            ));
+        }
+
+        String userId = tokenOpt.get().getUserId();
+        List<UserSession> sessions = redisSessionService.getActiveSessions(userId);
+
         return ResponseEntity.ok(sessions);
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Extracts client IP address handling reverse proxy headers (X-Forwarded-For).
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String xfHeader = request.getHeader("X-Forwarded-For");
+        if (xfHeader == null || xfHeader.isBlank()) {
+            return request.getRemoteAddr();
+        }
+        return xfHeader.split(",")[0].trim();
     }
 }

@@ -1,21 +1,27 @@
 server:
-  port: 8081
+  port: ${PORT:8081}
 
 spring:
   application:
     name: user-service
 
-  # 1. Database Configuration (PostgreSQL)
+  # 1. Database Configuration (PostgreSQL with Hikari Connection Pool)
   datasource:
-    url: jdbc:postgresql://localhost:5432/netflix_user_db
-    username: postgres
-    password: postgre123
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/netflix_user_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgre123}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 20000
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
     properties:
       hibernate:
         format_sql: true
@@ -24,28 +30,53 @@ spring:
   # 2. Redis Configuration for Refresh Tokens & Active Device Sessions
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      timeout: 2000ms
 
-  # 3. Kafka Producer Configuration for Async Domain Events
+  # 3. Kafka Producer & Consumer Configuration
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.type.mapping: userRegisteredEvent:com.Netfilx.User.Event.UserRegisteredEvent
 
+    consumer:
+      group-id: user-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        # 🔒 SECURITY FIX: Restricted trusted packages to eliminate gadget deserialization RCE risks
+        spring.json.trusted.packages: "com.Netfilx.User.DTO.Request,com.Netfilx.User.Event,com.Netflix.payment_service.DTO"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: "com.Netfilx.User.DTO.Request.PaymentEvent"
+
 # 4. JWT & Session Expiration Settings
 jwt:
-  secret: TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$VTaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V
-  access-token-expiration-ms: 900000        # 15 Minutes
-  refresh-token-expiration-ms: 2592000000    # 30 Days (2,592,000,000 ms)
+  secret: ${JWT_SECRET:TaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$VTaK+HaV^uvCHEFsEVfypW#7g9^k*Z8$V}
+  access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}        # 15 Minutes
+  refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:2592000000}  # 30 Days
 
-# 5. Eureka Registration
+# 5. Spring Boot Actuator Monitoring & Health Check Probes
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# 6. Eureka Service Discovery Registration
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true

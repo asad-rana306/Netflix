@@ -2,7 +2,10 @@ package com.Netfilx.Catalog.Entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -40,6 +43,8 @@ public class Title {
 
     private Integer releaseYear;
 
+    // ✅ FIXES N+1 QUERY: Fetches genres for up to 25 titles in 1 batch query
+    @BatchSize(size = 25)
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "title_genres",
@@ -56,4 +61,5 @@ public class Title {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
 }
