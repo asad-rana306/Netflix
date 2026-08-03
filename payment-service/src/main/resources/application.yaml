@@ -1,0 +1,39 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: PAYMENT-SERVICE
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/netflix_payment_db}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres123}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+stripe:
+  api-key: ${STRIPE_API_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+  success-url: "${FRONTEND_PUBLIC_URL:http://localhost:5173}/payment/success?session_id={CHECKOUT_SESSION_ID}"
+  cancel-url: "${FRONTEND_PUBLIC_URL:http://localhost:5173}/payment/cancel"
+  prices:
+    standard: ${STRIPE_PRICE_STANDARD:price_placeholder}
+    premium: ${STRIPE_PRICE_PREMIUM:price_placeholder}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
+  instance:
+    prefer-ip-address: true
