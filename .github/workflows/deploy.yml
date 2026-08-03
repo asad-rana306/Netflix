@@ -22,16 +22,14 @@ jobs:
           script: |
             set -e
 
-            # Clone repository if ~/Netflix directory doesn't exist yet
             if [ ! -d "$HOME/Netflix" ]; then
               echo ">>> Directory ~/Netflix not found. Cloning repository..."
               git clone https://github.com/${{ github.repository }}.git ~/Netflix
             fi
 
-            echo ">>> Navigating to project directory..."
             cd ~/Netflix
 
-            echo ">>> Pulling latest code from main branch..."
+            echo ">>> Pulling latest code..."
             git fetch --all
             git reset --hard origin/main
 
@@ -40,9 +38,15 @@ jobs:
             ${{ secrets.PROD_ENV_FILE }}
             EOF
 
-            echo ">>> Rebuilding and starting Docker Compose containers..."
+            echo ">>> Cleaning up old Docker build cache..."
+            docker system prune -f
+
+            echo ">>> Building microservices sequentially to save RAM..."
+            docker compose build --parallel=2
+
+            echo ">>> Launching containers..."
             docker compose down
-            docker compose up --build -d
+            docker compose up -d
 
             echo ">>> Deployment Complete! Active containers:"
             docker compose ps
