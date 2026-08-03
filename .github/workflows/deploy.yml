@@ -21,8 +21,15 @@ jobs:
           key: ${{ secrets.AWS_EC2_SSH_KEY }}
           script: |
             set -e
+
+            # Clone repository if ~/Netflix directory doesn't exist yet
+            if [ ! -d "$HOME/Netflix" ]; then
+              echo ">>> Directory ~/Netflix not found. Cloning repository..."
+              git clone https://github.com/${{ github.repository }}.git ~/Netflix
+            fi
+
             echo ">>> Navigating to project directory..."
-            cd ~/netfilx
+            cd ~/Netflix
 
             echo ">>> Pulling latest code from main branch..."
             git fetch --all
