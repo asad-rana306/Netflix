@@ -136,39 +136,50 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
-      EUREKA_CLIENT_ENABLED: "true"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: netflix-clone-media-bucket
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
 
   catalog-service:
-    build:
-      context: ./Catalog
-      dockerfile: Dockerfile
-    container_name: netflix-catalog-service
-    restart: "no"
-    ports:
-      - "8082:8082"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:5432/netflix_catalog_db
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      REDIS_HOST: redis
-      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:+UseG1GC"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      build:
+        context: ./Catalog
+        dockerfile: Dockerfile
+      container_name: netflix-catalog-service
+      restart: "no"
+      ports:
+        - "8082:8082"
+      environment:
+        SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:5432/netflix_catalog_db
+        SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+        SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+        REDIS_HOST: redis
+        AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+        AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+        AWS_REGION: us-east-1
+        AWS_S3_BUCKET: netflix-clone-media-bucket
+        JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC"
+        EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
 
   streaming-service:
-    build:
-      context: ./Streaming
-      dockerfile: Dockerfile
-    container_name: netflix-streaming-service
-    restart: "no"
-    ports:
-      - "8083:8083"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/netflix_streaming_db
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_PROFILES_ACTIVE: default
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      build:
+        context: ./Streaming
+        dockerfile: Dockerfile
+      container_name: netflix-streaming-service
+      restart: "no"
+      ports:
+        - "8083:8083"
+      environment:
+        DB_HOST: postgres
+        DB_PORT: 5432
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+        AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+        AWS_REGION: us-east-1
+        AWS_S3_BUCKET: netflix-clone-media-bucket
+        EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
 
   payment-service:
     build:

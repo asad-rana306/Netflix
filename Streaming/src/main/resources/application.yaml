@@ -2,75 +2,55 @@ server:
   port: 8083
 
 aws:
-  access-key: ${AWS_ACCESS_KEY_ID}
-  secret-key: ${AWS_SECRET_ACCESS_KEY}
-  region: us-east-1
+  access-key: ${AWS_ACCESS_KEY_ID:dummy_access_key}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:dummy_secret_key}
+  region: ${AWS_REGION:us-east-1}
   s3:
-    bucket: netflix-clone-media-bucket
+    bucket: ${AWS_S3_BUCKET:netflix-clone-media-bucket}
 
 spring:
   application:
     name: streaming-service
 
-  # ⚡ 1. ENABLE JAVA 21 VIRTUAL THREADS
   threads:
     virtual:
       enabled: true
 
-  # 🛑 DISABLE KAFKA FOR CURRENT LOAD TESTING
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
-  # 2. ALLOW LARGE VIDEO UPLOADS (Up to 10GB)
   servlet:
     multipart:
       enabled: true
-      max-file-size: 10GB
-      max-request-size: 10GB
+      max-file-size: 5GB
+      max-request-size: 5GB
 
-  # 3. DATABASE CONFIGURATION (Pointed to PgBouncer)
   datasource:
-    # ⚡ POINT TO PGBOUNCER (Port 6432 instead of raw PostgreSQL 5432)
-    url: jdbc:postgresql://localhost:6432/netflix_streaming_db
-    username: postgres
-    password: postgres123
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/netflix_streaming_db
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres123}
     driver-class-name: org.postgresql.Driver
-
-    # ⚡ HIKARICP OPTIMIZATION FOR 5,000+ CONCURRENT USERS
     hikari:
-      maximum-pool-size: 50             # Expanded from default 10 to 50
-      minimum-idle: 10                  # Warm connections ready
-      idle-timeout: 30000               # 30 seconds
-      max-lifetime: 1800000             # 30 minutes
-      connection-timeout: 10000         # Fail fast after 10s if pool is saturated
-      pool-name: StreamingHikariPool
+      maximum-pool-size: 30
+      minimum-idle: 10
+      idle-timeout: 30000
+      connection-timeout: 10000
 
   jpa:
     hibernate:
-      # ⚠️ CHANGED TO 'update' - 'create' wipes your tables and unique constraints on every boot!
       ddl-auto: update
     show-sql: false
 
-#  data:
-#    redis:
-#      host: localhost
-#      port: 6379
-
 app:
   video:
-    storage-path: /Users/anandkamath/Documents/netflix-media/
-    temp-path: /Users/anandkamath/Documents/netflix-media/temp/
-    ffmpeg-path: /opt/homebrew/bin/ffmpeg
+    storage-path: ${VIDEO_STORAGE_PATH:/tmp/netflix-media/}
+    temp-path: ${VIDEO_TEMP_PATH:/tmp/netflix-media/temp/}
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
   instance:
     prefer-ip-address: true
-
-logging:
-  level:
-    org.apache.kafka: OFF
-    org.springframework.kafka: OFF
