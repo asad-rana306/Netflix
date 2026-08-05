@@ -152,4 +152,37 @@ public class CatalogService {
                 .toList();
         return new PaginatedResponse<>(content, titleSlice.hasNext(), titleSlice.getNumber());
     }
+    // ==========================================
+    // WRITE OPERATIONS (S3 ASSET UPDATES)
+    // ==========================================
+
+    @Caching(evict = {
+            @CacheEvict(value = "titleDetails", key = "#id", cacheManager = "redisCacheManager"),
+            @CacheEvict(value = "homeFeed", allEntries = true, cacheManager = "caffeineCacheManager"),
+            @CacheEvict(value = "searchResults", allEntries = true, cacheManager = "redisCacheManager")
+    })
+    @Transactional
+    public TitleResponse updateMovieThumbnailKey(UUID id, String s3Key) {
+        Title title = titleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Title not found with ID: " + id));
+
+        title.setThumbnailUrl(s3Key);
+        titleRepository.save(title);
+        return mapToDto(title);
+    }
+
+    @Caching(evict = {
+            @CacheEvict(value = "titleDetails", key = "#id", cacheManager = "redisCacheManager"),
+            @CacheEvict(value = "homeFeed", allEntries = true, cacheManager = "caffeineCacheManager"),
+            @CacheEvict(value = "searchResults", allEntries = true, cacheManager = "redisCacheManager")
+    })
+    @Transactional
+    public TitleResponse updateMovieVideoKey(UUID id, String s3Key) {
+        Title title = titleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Title not found with ID: " + id));
+
+        title.setHlsMasterUrl(s3Key);
+        titleRepository.save(title);
+        return mapToDto(title);
+    }
 }

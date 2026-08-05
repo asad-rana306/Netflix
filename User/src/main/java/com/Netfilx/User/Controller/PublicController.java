@@ -8,10 +8,7 @@ import com.Netfilx.User.Entity.RefreshToken;
 import com.Netfilx.User.Entity.User;
 import com.Netfilx.User.Entity.UserSession;
 import com.Netfilx.User.Event.UserRegisteredEvent;
-import com.Netfilx.User.Service.KafkaProducerService;
-import com.Netfilx.User.Service.RedisSessionService;
-import com.Netfilx.User.Service.UserDetailServiceImpl;
-import com.Netfilx.User.Service.UserService;
+import com.Netfilx.User.Service.*;
 import com.Netfilx.User.Utils.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -24,7 +21,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +42,8 @@ public class PublicController {
     private final UserService userService;
     private final RedisSessionService redisSessionService;
     private final KafkaProducerService kafkaProducerService;
+    private final S3Service s3Service;
+
 
     /**
      * Health check endpoint for API Gateway and discovery probes.
@@ -52,6 +53,25 @@ public class PublicController {
         return ResponseEntity.ok(Map.of(
                 "status", "UP",
                 "message", "User Service Public API is operational"
+        ));
+    }
+
+    @PostMapping("/{userId}/avatar")
+    public ResponseEntity<Map<String, String>> uploadAvatar(
+            @PathVariable UUID userId,
+            @RequestParam("file") MultipartFile file) throws IOException {
+
+        // 1. Store binary in S3 under 'profile-pictures/'
+        String fileName = userId + "-" + file.getOriginalFilename();
+        String s3Key = s3Service.uploadFile("profile-pictures", fileName, file);
+
+        // 2. Persist s3Key into users table 'avatar_url' column
+        userService.updateProfilePictureKey(userId, s3Key);
+
+        return ResponseEntity.ok(Map.of(
+                "userId", userId.toString(),
+                "message", "Avatar uploaded successfully",
+                "avatarUrl", s3Key
         ));
     }
 

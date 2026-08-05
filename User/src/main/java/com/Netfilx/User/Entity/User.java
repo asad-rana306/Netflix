@@ -40,4 +40,7 @@ public class User {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
 }

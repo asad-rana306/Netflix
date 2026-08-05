@@ -1,6 +1,13 @@
 server:
   port: 8083
 
+aws:
+  access-key: ${AWS_ACCESS_KEY_ID}
+  secret-key: ${AWS_SECRET_ACCESS_KEY}
+  region: us-east-1
+  s3:
+    bucket: netflix-clone-media-bucket
+
 spring:
   application:
     name: streaming-service

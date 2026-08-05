@@ -131,4 +131,32 @@ public class UserService {
         userRepository.deleteById(id);
         log.info("Successfully deleted user ID: {}", id);
     }
+    /**
+     * Updates a user's avatar / profile picture S3 key in PostgreSQL.
+     */
+    /**
+     * Updates a user's avatar / profile picture S3 key in PostgreSQL.
+     *
+     * @param userId The UUID of the user.
+     * @param s3Key  The S3 object key (e.g., "profile-pictures/userId-avatar.jpg").
+     * @return Updated User entity.
+     */
+    @Transactional
+    public User updateProfilePictureKey(UUID userId, String s3Key) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID must not be null.");
+        }
+        if (s3Key == null || s3Key.isBlank()) {
+            throw new IllegalArgumentException("S3 Key must not be null or blank.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+
+        user.setAvatarUrl(s3Key);
+
+        User updatedUser = userRepository.save(user);
+        log.info("Successfully updated avatarUrl S3 key for user ID: {}", userId);
+        return updatedUser;
+    }
 }

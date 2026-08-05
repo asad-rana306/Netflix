@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Slf4j
-@Component
+//@Component
 @RequiredArgsConstructor
 public class CatalogDatabaseSeeder implements CommandLineRunner {
 
@@ -87,7 +87,7 @@ public class CatalogDatabaseSeeder implements CommandLineRunner {
         // 🔥 NOTICE: Removed fat_payload from the INSERT statement
         String sqlTitles = """
             INSERT INTO titles (
-                id, title, description, type, maturity_rating, 
+                id, title, description, type, maturity_rating,
                 thumbnail_url, hls_master_url, preview_url, release_year, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         """;

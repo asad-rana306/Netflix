@@ -60,6 +60,13 @@
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-openfeign</artifactId>
 		</dependency>
+		<!-- AWS Java SDK v2 S3 Module -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.20</version>
+		</dependency>
+
 
 		<!-- Database & Lombok -->
 		<dependency>
