@@ -11,17 +11,10 @@ import software.amazon.awssdk.services.s3.S3Client;
 @Configuration
 public class S3Config {
 
-<<<<<<< HEAD
-    @Value("${aws.access-key}")
-    private String accessKey;
-
-    @Value("${aws.secret-key}")
-=======
     @Value("${aws.access-key:dummy_access_key}")
     private String accessKey;
 
     @Value("${aws.secret-key:dummy_secret_key}")
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
     private String secretKey;
 
     @Value("${aws.region:us-east-1}")
@@ -29,12 +22,6 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client() {
-<<<<<<< HEAD
-        return S3Client.builder()
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
-=======
         String cleanAccessKey = (accessKey != null && !accessKey.isBlank()) ? accessKey : "dummy_access_key";
         String cleanSecretKey = (secretKey != null && !secretKey.isBlank()) ? secretKey : "dummy_secret_key";
         String cleanRegion = (region != null && !region.isBlank()) ? region : "us-east-1";
@@ -44,7 +31,6 @@ public class S3Config {
         return S3Client.builder()
                 .region(Region.of(cleanRegion))
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
                 .build();
     }
 }

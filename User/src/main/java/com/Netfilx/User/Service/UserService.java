@@ -132,10 +132,7 @@ public class UserService {
         userRepository.deleteById(id);
         log.info("Successfully deleted user ID: {}", id);
     }
-<<<<<<< HEAD
-    /**
-     * Updates a user's avatar / profile picture S3 key in PostgreSQL.
-     */
+
     /**
      * Updates a user's avatar / profile picture S3 key in PostgreSQL.
      *
@@ -160,8 +157,11 @@ public class UserService {
         User updatedUser = userRepository.save(user);
         log.info("Successfully updated avatarUrl S3 key for user ID: {}", userId);
         return updatedUser;
-=======
+    }
 
+    /**
+     * Updates a user's subscription details by UUID or email address.
+     */
     @Transactional
     public void updateSubscription(String identifier, UpdateSubscriptionRequest request) {
         User user = findUserByIdOrEmail(identifier)
@@ -189,6 +189,5 @@ public class UserService {
         } catch (IllegalArgumentException e) {
             return userRepository.findByEmail(identifier.trim().toLowerCase());
         }
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
     }
 }

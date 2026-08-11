@@ -6,7 +6,6 @@ import com.Netfilx.User.DTO.Response.ProfileResponse;
 import com.Netfilx.User.Entity.Profile;
 import com.Netfilx.User.Entity.User;
 import com.Netfilx.User.Repository.ProfileRepository;
-import com.Netfilx.User.Repository.UserRepository;
 import com.Netfilx.User.Service.ProfileService;
 import com.Netfilx.User.Service.S3Service;
 import com.Netfilx.User.Service.UserService;
@@ -34,6 +33,7 @@ public class ProfileController {
     private final UserService userService;
     private final ProfileRepository profileRepository;
     private final S3Service s3Service;
+
     /**
      * Creates a new profile for the authenticated user account.
      */
@@ -73,7 +73,6 @@ public class ProfileController {
         String email = getAuthenticatedEmail(authentication);
         log.info("REST request to verify PIN for profile ID: {} by user: {}", profileId, email);
 
-        // 🔒 Enforces user ownership check in service layer
         boolean isValid = profileService.verifyPin(email, profileId, request);
 
         if (isValid) {
@@ -104,20 +103,6 @@ public class ProfileController {
         return ResponseEntity.noContent().build();
     }
 
-    // ==================== HELPER METHODS ====================
-
-    /**
-     * Safely extracts and normalizes the user email from the SecurityContext Authentication object.
-     */
-    private String getAuthenticatedEmail(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
-            log.error("Security Violation: Unauthenticated or null principal in SecurityContext.");
-            throw new SecurityException("User authentication principal is missing or invalid.");
-        }
-        return authentication.getName().trim().toLowerCase();
-    }
-
-
     @PostMapping("/users/{userId}/profiles")
     public ResponseEntity<?> createProfile(
             @PathVariable UUID userId,
@@ -140,13 +125,27 @@ public class ProfileController {
         return ResponseEntity.ok(profile);
     }
 
+    /**
+     * Uploads avatar image to S3 folder "avatars"
+     */
     @PostMapping("/avatar")
     public ResponseEntity<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
         try {
-            String fileUrl = s3Service.uploadFile(file, "avatars");
+            // FIXED: Swap arguments to match S3Service signature: uploadFile(String folder, MultipartFile file)
+            String fileUrl = s3Service.uploadFile("avatars", file);
             return ResponseEntity.ok(fileUrl);
         } catch (IOException e) {
             return ResponseEntity.internalServerError().body("Failed to upload image: " + e.getMessage());
         }
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    private String getAuthenticatedEmail(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            log.error("Security Violation: Unauthenticated or null principal in SecurityContext.");
+            throw new SecurityException("User authentication principal is missing or invalid.");
+        }
+        return authentication.getName().trim().toLowerCase();
     }
 }

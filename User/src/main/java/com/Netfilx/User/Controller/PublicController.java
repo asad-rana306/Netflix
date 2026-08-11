@@ -5,15 +5,9 @@ import com.Netfilx.User.DTO.Request.RefreshTokenRequest;
 import com.Netfilx.User.DTO.Request.SignupRequest;
 import com.Netfilx.User.DTO.Request.UpdateSubscriptionRequest;
 import com.Netfilx.User.DTO.Response.AuthResponse;
-import com.Netfilx.User.Entity.Profile;
-import com.Netfilx.User.Entity.RefreshToken;
-import com.Netfilx.User.Entity.User;
-import com.Netfilx.User.Entity.UserSession;
+import com.Netfilx.User.Entity.*;
 import com.Netfilx.User.Event.UserRegisteredEvent;
-<<<<<<< HEAD
-=======
-import com.Netfilx.User.Repository.ProfileRepository;
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
+import com.Netfilx.User.Repository.ProfileRepository; // Markers removed
 import com.Netfilx.User.Service.*;
 import com.Netfilx.User.Utils.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,10 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @RestController
@@ -49,10 +40,7 @@ public class PublicController {
     private final RedisSessionService redisSessionService;
     private final KafkaProducerService kafkaProducerService;
     private final S3Service s3Service;
-<<<<<<< HEAD
-=======
     private final ProfileRepository profileRepository;
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 
 
     /**
@@ -73,7 +61,7 @@ public class PublicController {
 
         // 1. Store binary in S3 under 'profile-pictures/'
         String fileName = userId + "-" + file.getOriginalFilename();
-        String s3Key = s3Service.uploadFile("profile-pictures", fileName, file);
+        String s3Key = s3Service.uploadFile("profile-pictures", file);
 
         // 2. Persist s3Key into users table 'avatar_url' column
         userService.updateProfilePictureKey(userId, s3Key);
