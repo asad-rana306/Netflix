@@ -11,7 +11,7 @@ import org.springframework.kafka.core.KafkaAdmin;
 import java.util.HashMap;
 import java.util.Map;
 
-@Configuration
+//@Configuration
 public class KafkaTopicConfig {
 
     public static final String USER_EVENTS_TOPIC = "user-events";

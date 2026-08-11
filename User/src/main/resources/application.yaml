@@ -2,13 +2,26 @@ server:
   port: ${PORT:8081}
 
 aws:
+<<<<<<< HEAD
   access-key: ${AWS_ACCESS_KEY_ID}
   secret-key: ${AWS_SECRET_ACCESS_KEY}
   region: us-east-1
   s3:
     bucket: netflix-clone-media-bucket
+=======
+  access-key: ${AWS_ACCESS_KEY_ID:dummy_access_key}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:dummy_secret_key}
+  region: ${AWS_REGION:us-east-1}
+  s3:
+    bucket: ${AWS_S3_BUCKET:netflix-clone-media-bucket}
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 
 spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
   application:
     name: user-service
 

@@ -1,15 +1,24 @@
 import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 
 export const options = {
     discardResponseBodies: true,
 
-    stages: [
-        { duration: '5s',  target: 1 },    // 1. Warmup stage: Populates Redis cache smoothly
-        { duration: '15s', target: 2500 }, // 2. Spike to 2,500 VUs against WARM Redis cache
-        { duration: '20s', target: 2500 }, // 3. Hold load
-        { duration: '5s',  target: 0 },    // 4. Ramp down
-    ],
+    scenarios: {
+        find_breaking_point: {
+            executor: 'ramping-arrival-rate',
+            startRate: 1000,            // Start at 1,000 req/sec
+            timeUnit: '1s',
+            preAllocatedVUs: 1000,      // Pre-allocate memory
+            maxVUs: 4000,               // Cap max OS thread pool
+            stages: [
+                { duration: '15s', target: 2000 },  // Step 1: 2k RPS
+                { duration: '30s', target: 5000 },  // Step 2: Push to 5k RPS
+                { duration: '30s', target: 8000 },  // Step 3: Push to 8k RPS (Stress Phase)
+                { duration: '15s', target: 0 },     // Ramp down
+            ],
+        },
+    },
 
     thresholds: {
         http_req_duration: ['p(95)<2000'],
@@ -17,10 +26,10 @@ export const options = {
     },
 };
 
-const BASE_URL = 'http://localhost:8082/api/v1/catalog/titles';
+const BASE_URL = 'http://localhost:8000/api/v1/catalog/titles';
+const JWT_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhc2FkY29kZWNyYWZ0QGdtYWlsLmNvbSIsImlhdCI6MTc4NjAwOTUyNywiZXhwIjoxNzg2MDk1OTI3fQ.F9nSAn297O5PP644Xebjh2MZgKb75VHYcBegBEd_Z5P49JqWtPi7GRCCwNaR4AFpY9h7Ypn08knv3sXTW-VjPg';
 
 export default function () {
-    // 🎲 Select pages 1 to 50 with size=20 (matching your Redis cache key format)
     const randomPage = Math.floor(Math.random() * 50) + 1;
     const url = `${BASE_URL}?query=all&page=${randomPage}&size=20`;
 
@@ -28,6 +37,7 @@ export default function () {
         headers: {
             'Accept': 'application/json',
             'Accept-Encoding': 'gzip',
+            'Authorization': `Bearer ${JWT_TOKEN}`,
         },
         tags: { name: 'GetCatalogTitles' },
     });
@@ -35,6 +45,4 @@ export default function () {
     check(res, {
         'status is 200': (r) => r.status === 200,
     });
-
-    sleep(Math.random() * 0.5 + 0.5);
 }

@@ -27,6 +27,7 @@ public class Profile {
     @Column(nullable = false, length = 100)
     private String profileName;
 
+    @Column(nullable = false)
     private String avatarUrl;
 
     @Builder.Default

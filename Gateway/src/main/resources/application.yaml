@@ -1,5 +1,5 @@
 server:
-  port: 8000
+  port: 8001
   netty:
     # Boost Netty IO threads to handle thousands of concurrent sockets
     connection-timeout: 3000ms
@@ -48,12 +48,12 @@ spring:
           uri: lb://CATALOG-SERVICE
           predicates:
             - Path=/api/v1/catalog/**, /api/v1/titles/**
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 200
-                key-resolver: "#{@userKeyResolver}"
+#          filters:
+#            - name: RequestRateLimiter
+#              args:
+#                redis-rate-limiter.replenishRate: 100
+#                redis-rate-limiter.burstCapacity: 200
+#                key-resolver: "#{@userKeyResolver}"
 
         # Route 3: Streaming Service
         - id: streaming-service

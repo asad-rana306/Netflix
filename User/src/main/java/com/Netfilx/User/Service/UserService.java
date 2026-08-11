@@ -1,5 +1,6 @@
 package com.Netfilx.User.Service;
 
+import com.Netfilx.User.DTO.Request.UpdateSubscriptionRequest;
 import com.Netfilx.User.Entity.Subscription;
 import com.Netfilx.User.Entity.User;
 import com.Netfilx.User.Repository.UserRepository;
@@ -131,6 +132,7 @@ public class UserService {
         userRepository.deleteById(id);
         log.info("Successfully deleted user ID: {}", id);
     }
+<<<<<<< HEAD
     /**
      * Updates a user's avatar / profile picture S3 key in PostgreSQL.
      */
@@ -158,5 +160,35 @@ public class UserService {
         User updatedUser = userRepository.save(user);
         log.info("Successfully updated avatarUrl S3 key for user ID: {}", userId);
         return updatedUser;
+=======
+
+    @Transactional
+    public void updateSubscription(String identifier, UpdateSubscriptionRequest request) {
+        User user = findUserByIdOrEmail(identifier)
+                .orElseThrow(() -> new IllegalArgumentException("User not found for ID: " + identifier));
+
+        Subscription subscription = user.getSubscription();
+        if (subscription == null) {
+            subscription = new Subscription();
+            subscription.setUser(user);
+            user.setSubscription(subscription);
+        }
+
+        subscription.setPlanTier(request.getPlanTier());
+        subscription.setStatus(request.getStatus().toUpperCase());
+        if (request.getStripeCustomerId() != null && !request.getStripeCustomerId().isBlank()) {
+            subscription.setStripeCustomerId(request.getStripeCustomerId());
+        }
+
+        userRepository.save(user);
+    }
+
+    private Optional<User> findUserByIdOrEmail(String identifier) {
+        try {
+            return userRepository.findById(UUID.fromString(identifier.trim()));
+        } catch (IllegalArgumentException e) {
+            return userRepository.findByEmail(identifier.trim().toLowerCase());
+        }
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
     }
 }

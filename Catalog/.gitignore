@@ -51,3 +51,5 @@ venv/
 target/
 *.jar
 *.log
+
+env.sh

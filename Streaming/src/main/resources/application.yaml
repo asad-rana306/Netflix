@@ -27,9 +27,16 @@ spring:
       max-request-size: 5GB
 
   datasource:
+<<<<<<< HEAD
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/netflix_streaming_db
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres123}
+=======
+    # ⚡ POINT TO PGBOUNCER (Port 6432 instead of raw PostgreSQL 5432)
+    url: jdbc:postgresql://localhost:5432/netflix_streaming_db
+    username: postgres
+    password: postgres123
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 30
@@ -42,6 +49,19 @@ spring:
       ddl-auto: update
     show-sql: false
 
+<<<<<<< HEAD
+=======
+#  data:
+#    redis:
+#      host: localhost
+#      port: 6379
+aws:
+  s3:
+    bucket-name: netflix-clone-media-bucket
+    region: us-east-1
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:dummy_secret_key}
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 app:
   video:
     storage-path: ${VIDEO_STORAGE_PATH:/tmp/netflix-media/}

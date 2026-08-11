@@ -10,5 +10,6 @@ public record TitleSummaryDto(
         String maturityRating,
         String thumbnailUrl,
         Integer releaseYear,
-        Set<String> genres
+        Set<String> genres,
+        String hlsMasterUrl
 ) {}

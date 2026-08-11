@@ -132,7 +132,8 @@ public class CatalogService {
         return new TitleSummaryDto(
                 title.getId(), title.getTitle(), title.getType(), title.getMaturityRating(),
                 title.getThumbnailUrl(), title.getReleaseYear(),
-                title.getGenres().stream().map(Genre::getName).collect(Collectors.toSet())
+                title.getGenres().stream().map(Genre::getName).collect(Collectors.toSet()),
+                title.getHlsMasterUrl()
         );
     }
 

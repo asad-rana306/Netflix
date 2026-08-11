@@ -1,5 +1,6 @@
 package com.Netfilx.User.Service;
 
+<<<<<<< HEAD
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,10 +16,24 @@ import java.io.IOException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+=======
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@Service
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 public class S3Service {
 
     private final S3Client s3Client;
 
+<<<<<<< HEAD
     @Value("${aws.s3.bucket}")
     private String bucketName;
 
@@ -32,10 +47,29 @@ public class S3Service {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
+=======
+    @Value("${aws.s3.bucket:netflix-clone-media-bucket}")
+    private String bucketName;
+
+    @Value("${aws.region:us-east-1}")
+    private String region;
+
+    public S3Service(S3Client s3Client) {
+        this.s3Client = s3Client;
+    }
+
+    public String uploadFile(MultipartFile file, String folder) throws IOException {
+        String fileName = folder + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileName)
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
                 .contentType(file.getContentType())
                 .build();
 
         s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+<<<<<<< HEAD
         log.info("Successfully uploaded file to S3 bucket [{}]: {}", bucketName, key);
 
         return key;
@@ -77,5 +111,9 @@ public class S3Service {
 
         s3Client.deleteObject(deleteObjectRequest);
         log.info("Deleted S3 object [{}] from bucket [{}]", key, bucketName);
+=======
+
+        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, fileName);
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
     }
 }

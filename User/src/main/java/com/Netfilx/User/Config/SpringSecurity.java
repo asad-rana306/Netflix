@@ -68,6 +68,7 @@ public class SpringSecurity {
                 )
 
                 // 4. Configure Request Route Authorizations
+                // 4. Configure Request Route Authorizations
                 .authorizeHttpRequests(auth -> auth
                         // Public Swagger & Open API Documentation
                         .requestMatchers(
@@ -76,17 +77,18 @@ public class SpringSecurity {
                                 "/swagger-ui.html"
                         ).permitAll()
 
-                        // Health Check Probes for API Gateway & Eureka Discovery
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // Health Check Probes & Internal Error Forwarding
+                        .requestMatchers("/actuator/health", "/actuator/info", "/error").permitAll()
 
                         // Public Authentication & Registration Endpoints
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/internal/**").permitAll()
 
                         // Admin Restricted Endpoints
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // Global Catch-All (Profiles & protected endpoints require valid JWT)
+                        // Global Catch-All
                         .anyRequest().authenticated()
                 )
 

@@ -3,11 +3,17 @@ package com.Netfilx.User.Controller;
 import com.Netfilx.User.DTO.Request.LoginRequest;
 import com.Netfilx.User.DTO.Request.RefreshTokenRequest;
 import com.Netfilx.User.DTO.Request.SignupRequest;
+import com.Netfilx.User.DTO.Request.UpdateSubscriptionRequest;
 import com.Netfilx.User.DTO.Response.AuthResponse;
+import com.Netfilx.User.Entity.Profile;
 import com.Netfilx.User.Entity.RefreshToken;
 import com.Netfilx.User.Entity.User;
 import com.Netfilx.User.Entity.UserSession;
 import com.Netfilx.User.Event.UserRegisteredEvent;
+<<<<<<< HEAD
+=======
+import com.Netfilx.User.Repository.ProfileRepository;
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 import com.Netfilx.User.Service.*;
 import com.Netfilx.User.Utils.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,6 +49,10 @@ public class PublicController {
     private final RedisSessionService redisSessionService;
     private final KafkaProducerService kafkaProducerService;
     private final S3Service s3Service;
+<<<<<<< HEAD
+=======
+    private final ProfileRepository profileRepository;
+>>>>>>> 08f2502 (attached S3 and successfully streamed on local)
 
 
     /**
@@ -274,5 +284,15 @@ public class PublicController {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0].trim();
+    }
+
+
+    @PutMapping("/{userId}/subscription")
+    public ResponseEntity<Void> updateSubscription(
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateSubscriptionRequest request) {
+
+        userService.updateSubscription(userId, request);
+        return ResponseEntity.ok().build();
     }
 }

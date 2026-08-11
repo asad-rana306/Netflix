@@ -1,9 +1,11 @@
 package com.Netflix.payment_service.Service;
 
+import com.Netflix.payment_service.client.UserServiceClient;
 import com.Netflix.payment_service.DTO.CheckoutRequest;
 import com.Netflix.payment_service.DTO.CheckoutResponse;
 import com.Netflix.payment_service.DTO.PaymentEvent;
 import com.Netflix.payment_service.DTO.SubscriptionStatusResponse;
+import com.Netflix.payment_service.DTO.UpdateSubscriptionRequest;
 import com.Netflix.payment_service.Entity.Subscription;
 import com.Netflix.payment_service.Repository.SubscriptionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +41,7 @@ public class PaymentService {
     private final StringRedisTemplate redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final UserServiceClient userServiceClient;
 
     @Value("${stripe.api-key}")
     private String stripeApiKey;
@@ -52,7 +55,6 @@ public class PaymentService {
     @Value("${stripe.cancel-url}")
     private String cancelUrl;
 
-    // Optional price ID mappings from application.yml (fallbacks if raw priceId is not a Stripe price_ ID)
     @Value("${stripe.prices.standard:}")
     private String standardPriceId;
 
@@ -67,7 +69,20 @@ public class PaymentService {
         Stripe.apiKey = stripeApiKey;
     }
 
+    /**
+     * Creates a Stripe Checkout Session. Prevents execution if user already holds an ACTIVE subscription.
+     */
     public CheckoutResponse createCheckoutSession(String userId, String userEmail, CheckoutRequest request) throws StripeException {
+        // 🔒 Guard Clause: Block checkout if active subscription exists
+        boolean hasActiveSub = subscriptionRepository.findByUserId(userId)
+                .map(sub -> sub.getStatus() == Subscription.SubscriptionStatus.ACTIVE)
+                .orElse(false);
+
+        if (hasActiveSub) {
+            log.warn(">>> Checkout blocked: User ID {} already has an ACTIVE subscription.", userId);
+            throw new IllegalStateException("You already have an active subscription.");
+        }
+
         String resolvedPriceId = resolvePriceId(request.priceId(), request.planTier());
 
         SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
@@ -91,6 +106,48 @@ public class PaymentService {
         Session session = Session.create(paramsBuilder.build());
         log.info(">>> Created Checkout Session ID: {} for userId: {} (Price: {})", session.getId(), userId, resolvedPriceId);
         return new CheckoutResponse(session.getUrl(), session.getId());
+    }
+
+    /**
+     * Cancels subscription in Stripe, updates payment-service DB, evicts Redis cache, and syncs user-service via OpenFeign.
+     */
+    @Transactional
+    public void cancelSubscription(String userId) throws StripeException {
+        Subscription subscription = subscriptionRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("No subscription record found for user ID: " + userId));
+
+        if (subscription.getStatus() != Subscription.SubscriptionStatus.ACTIVE) {
+            throw new IllegalStateException("Subscription is not active and cannot be canceled.");
+        }
+
+        // 1. Cancel active subscription in Stripe
+        if (subscription.getStripeSubscriptionId() != null && !subscription.getStripeSubscriptionId().startsWith("sub_test_dummy")) {
+            com.stripe.model.Subscription stripeSub = com.stripe.model.Subscription.retrieve(subscription.getStripeSubscriptionId());
+            stripeSub.cancel();
+            log.info(">>> Successfully canceled Stripe subscription ID: {}", subscription.getStripeSubscriptionId());
+        }
+
+        // 2. Update payment-service local PostgreSQL DB
+        subscription.setStatus(Subscription.SubscriptionStatus.CANCELED);
+        subscription.setUpdatedAt(LocalDateTime.now());
+        subscriptionRepository.save(subscription);
+
+        // 3. Evict Redis cache
+        try {
+            redisTemplate.delete(REDIS_SUB_KEY_PREFIX + userId + ":subscription");
+        } catch (Exception e) {
+            log.warn(">>> Failed to clear Redis subscription cache for user {}: {}", userId, e.getMessage());
+        }
+
+        // 4. Synchronously update user-service state to INACTIVE via OpenFeign
+        syncSubscriptionToUserService(userId, subscription.getStripeCustomerId(), "INACTIVE", subscription.getPlanTier());
+
+        // 5. Emit background Kafka event
+        try {
+            publishPaymentEvent(userId, null, subscription.getStripeCustomerId(), "CANCELED", subscription.getPlanTier(), "SUBSCRIPTION_CANCELED");
+        } catch (Exception e) {
+            log.warn(">>> Kafka event dispatch skipped: {}", e.getMessage());
+        }
     }
 
     @Transactional
@@ -181,6 +238,9 @@ public class PaymentService {
             log.warn(">>> Redis skipped: {}", e.getMessage());
         }
 
+        // Synchronously update user-service via OpenFeign
+        syncSubscriptionToUserService(finalUserId, stripeCustomerId, "ACTIVE", planTier);
+
         try {
             publishPaymentEvent(finalUserId, userEmail, stripeCustomerId, "ACTIVE", planTier, "PAYMENT_SUCCEEDED");
         } catch (Exception e) {
@@ -196,6 +256,9 @@ public class PaymentService {
             subscriptionRepository.save(sub);
             log.info(">>> Updated subscription to ACTIVE for customer: {}", stripeCustomerId);
 
+            // Synchronously update user-service via OpenFeign
+            syncSubscriptionToUserService(sub.getUserId(), stripeCustomerId, "ACTIVE", sub.getPlanTier());
+
             try {
                 publishPaymentEvent(sub.getUserId(), invoice.getCustomerEmail(), stripeCustomerId, "ACTIVE", sub.getPlanTier(), "INVOICE_PAYMENT_SUCCEEDED");
             } catch (Exception ignored) {}
@@ -209,6 +272,9 @@ public class PaymentService {
             sub.setUpdatedAt(LocalDateTime.now());
             subscriptionRepository.save(sub);
             log.info(">>> Updated subscription to PAST_DUE for customer: {}", stripeCustomerId);
+
+            // Synchronously update user-service via OpenFeign
+            syncSubscriptionToUserService(sub.getUserId(), stripeCustomerId, "INACTIVE", sub.getPlanTier());
 
             try {
                 publishPaymentEvent(sub.getUserId(), invoice.getCustomerEmail(), stripeCustomerId, "PAST_DUE", sub.getPlanTier(), "PAYMENT_FAILED");
@@ -225,6 +291,9 @@ public class PaymentService {
                 redisTemplate.delete(REDIS_SUB_KEY_PREFIX + sub.getUserId() + ":subscription");
             } catch (Exception ignored) {}
             log.info(">>> Canceled subscription for user: {}", sub.getUserId());
+
+            // Synchronously update user-service via OpenFeign
+            syncSubscriptionToUserService(sub.getUserId(), sub.getStripeCustomerId(), "INACTIVE", sub.getPlanTier());
         });
     }
 
@@ -239,7 +308,25 @@ public class PaymentService {
     }
 
     /**
-     * Resolves raw input strings (e.g., 'price_premium_4k' or 'PREMIUM') into valid Stripe Price IDs (price_1...).
+     * Helper to issue synchronous HTTP updates to user-service using OpenFeign.
+     */
+    private void syncSubscriptionToUserService(String userId, String stripeCustomerId, String status, String planTier) {
+        try {
+            UpdateSubscriptionRequest request = UpdateSubscriptionRequest.builder()
+                    .planTier(planTier != null ? planTier : "STANDARD")
+                    .status(status)
+                    .stripeCustomerId(stripeCustomerId)
+                    .build();
+
+            userServiceClient.updateSubscription(userId, request);
+            log.info(">>> Synchronously updated user-service subscription for userId: {}", userId);
+        } catch (Exception e) {
+            log.error(">>> Failed to sync subscription to user-service for userId {}: {}", userId, e.getMessage());
+        }
+    }
+
+    /**
+     * Resolves raw input strings into valid Stripe Price IDs.
      */
     private String resolvePriceId(String rawPriceId, String planTier) {
         if (rawPriceId != null && rawPriceId.startsWith("price_1")) {
@@ -270,6 +357,7 @@ public class PaymentService {
             return null;
         }
     }
+
     public SubscriptionStatusResponse getSubscriptionStatus(String userId) {
         return subscriptionRepository.findByUserId(userId)
                 .map(sub -> new SubscriptionStatusResponse(

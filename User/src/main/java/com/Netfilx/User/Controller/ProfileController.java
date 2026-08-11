@@ -3,7 +3,13 @@ package com.Netfilx.User.Controller;
 import com.Netfilx.User.DTO.Request.CreateProfileRequest;
 import com.Netfilx.User.DTO.Request.VerifyPinRequest;
 import com.Netfilx.User.DTO.Response.ProfileResponse;
+import com.Netfilx.User.Entity.Profile;
+import com.Netfilx.User.Entity.User;
+import com.Netfilx.User.Repository.ProfileRepository;
+import com.Netfilx.User.Repository.UserRepository;
 import com.Netfilx.User.Service.ProfileService;
+import com.Netfilx.User.Service.S3Service;
+import com.Netfilx.User.Service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,7 +31,9 @@ import java.util.UUID;
 public class ProfileController {
 
     private final ProfileService profileService;
-
+    private final UserService userService;
+    private final ProfileRepository profileRepository;
+    private final S3Service s3Service;
     /**
      * Creates a new profile for the authenticated user account.
      */
@@ -105,5 +115,38 @@ public class ProfileController {
             throw new SecurityException("User authentication principal is missing or invalid.");
         }
         return authentication.getName().trim().toLowerCase();
+    }
+
+
+    @PostMapping("/users/{userId}/profiles")
+    public ResponseEntity<?> createProfile(
+            @PathVariable UUID userId,
+            @RequestParam("profileName") String profileName,
+            @RequestParam("avatarUrl") String avatarUrl) {
+
+        User user = userService.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getProfiles().size() >= 5) {
+            return ResponseEntity.badRequest().body("Maximum limit of 5 profiles reached.");
+        }
+
+        Profile profile = new Profile();
+        profile.setUser(user);
+        profile.setProfileName(profileName);
+        profile.setAvatarUrl(avatarUrl);
+
+        profileRepository.save(profile);
+        return ResponseEntity.ok(profile);
+    }
+
+    @PostMapping("/avatar")
+    public ResponseEntity<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        try {
+            String fileUrl = s3Service.uploadFile(file, "avatars");
+            return ResponseEntity.ok(fileUrl);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body("Failed to upload image: " + e.getMessage());
+        }
     }
 }
