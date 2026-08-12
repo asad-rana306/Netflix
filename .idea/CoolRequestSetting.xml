@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CoolRequestSetting">
-<<<<<<< HEAD
-    <option name="projectCachePath" value="project-2a222d95-8c61-4982-a88b-faaf243979ea" />
-=======
-    <option name="projectCachePath" value="project-4c295c00-1743-46f7-b0fe-da04dac854a7" />
->>>>>>> 08f2502 (attached S3 and successfully streamed on local)
+    <option name="projectCachePath" value="project-c9c8da7e-0b2b-4b04-a407-341a131c1a5b" />
   </component>
 </project>

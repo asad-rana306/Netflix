@@ -12,18 +12,18 @@ server:
     max-connections: 2500
 
 aws:
-  access-key: ${AWS_ACCESS_KEY_ID}
-  secret-key: ${AWS_SECRET_ACCESS_KEY}
-  region: us-east-1
+  access-key: ${AWS_ACCESS_KEY_ID:dummy_access_key}
+  secret-key: ${AWS_SECRET_ACCESS_KEY:dummy_secret_key}
+  region: ${AWS_REGION:us-east-1}
   s3:
-    bucket: netflix-clone-media-bucket
+    bucket: ${AWS_S3_BUCKET:netflix-clone-media-bucket}
 
 spring:
   application:
     name: catalog-service
   threads:
     virtual:
-      enabled: true                # Enables Java 21 Virtual Threads
+      enabled: true
   data:
     redis:
       host: ${REDIS_HOST:redis}
@@ -31,7 +31,7 @@ spring:
       timeout: 2000ms
       lettuce:
         pool:
-          max-active: 200      # Allows up to 200 parallel sockets to Redis
+          max-active: 200
           max-idle: 50
           min-idle: 10
           max-wait: 1000ms
@@ -41,7 +41,7 @@ spring:
     password: ${POSTGRES_PASSWORD:postgres123}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 40        # Lean pool for PgBouncer integration
+      maximum-pool-size: 40
       minimum-idle: 10
       idle-timeout: 30000
       connection-timeout: 30000
@@ -49,7 +49,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: false                 # Stops terminal logging bottlenecks
+    show-sql: false
     properties:
       hibernate:
         default_batch_fetch_size: 100
