@@ -1,5 +1,5 @@
 server:
-  port: 8001
+  port: 8000
   netty:
     # Boost Netty IO threads to handle thousands of concurrent sockets
     connection-timeout: 3000ms
