@@ -6,7 +6,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: netflix-postgres
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -25,7 +25,7 @@ services:
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: netflix-pgbouncer
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "6432:5432"
     environment:
@@ -46,7 +46,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: netflix-redis
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -58,7 +58,7 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: netflix-zookeeper
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "2181:2181"
     environment:
@@ -68,7 +68,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: netflix-kafka
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "9092:9092"
     environment:
@@ -91,7 +91,7 @@ services:
     image: mailhog/mailhog:latest
     container_name: netflix-mailhog
     platform: linux/amd64
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "1025:1025"
       - "8025:8025"
@@ -105,11 +105,13 @@ services:
       context: ./Eureka
       dockerfile: Dockerfile
     container_name: netflix-eureka
-    restart: "no"
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "8761:8761"
     environment:
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,7 +127,8 @@ services:
       context: ./User
       dockerfile: Dockerfile
     container_name: netflix-user-service
-    restart: "no"
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "8081:8081"
     environment:
@@ -141,52 +144,80 @@ services:
       AWS_REGION: us-east-1
       AWS_S3_BUCKET: netflix-clone-media-bucket
       EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
   catalog-service:
-      build:
-        context: ./Catalog
-        dockerfile: Dockerfile
-      container_name: netflix-catalog-service
-      restart: "no"
-      ports:
-        - "8082:8082"
-      environment:
-        SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:5432/netflix_catalog_db
-        SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-        SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-        REDIS_HOST: redis
-        AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-        AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-        AWS_REGION: us-east-1
-        AWS_S3_BUCKET: netflix-clone-media-bucket
-        JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC"
-        EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+    build:
+      context: ./Catalog
+      dockerfile: Dockerfile
+    container_name: netflix-catalog-service
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:5432/netflix_catalog_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: netflix-clone-media-bucket
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC"
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
   streaming-service:
-      build:
-        context: ./Streaming
-        dockerfile: Dockerfile
-      container_name: netflix-streaming-service
-      restart: "no"
-      ports:
-        - "8083:8083"
-      environment:
-        DB_HOST: postgres
-        DB_PORT: 5432
-        POSTGRES_USER: ${POSTGRES_USER}
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-        AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-        AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-        AWS_REGION: us-east-1
-        AWS_S3_BUCKET: netflix-clone-media-bucket
-        EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+    build:
+      context: ./Streaming
+      dockerfile: Dockerfile
+    container_name: netflix-streaming-service
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: netflix-clone-media-bucket
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
   payment-service:
     build:
       context: ./payment-service
       dockerfile: Dockerfile
     container_name: netflix-payment-service
-    restart: "no"
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "8084:8084"
     environment:
@@ -203,23 +234,40 @@ services:
       STRIPE_CANCEL_URL: "${FRONTEND_PUBLIC_URL}/payment/cancel"
       STRIPE_PRICES_STANDARD: ${STRIPE_PRICE_STANDARD}
       STRIPE_PRICES_PREMIUM: ${STRIPE_PRICE_PREMIUM}
-      SPRING_CLOUD_NETFLIX_EUREKA_CLIENT_REGISTER_WITH_EUREKA: "true"
-      SPRING_CLOUD_NETFLIX_EUREKA_CLIENT_FETCH_REGISTRY: "true"
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
   notification-service:
     build:
       context: ./Notification
       dockerfile: Dockerfile
     container_name: netflix-notification-service
-    restart: "no"
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "8085:8085"
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_MAIL_HOST: mailhog
       SPRING_MAIL_PORT: 1025
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      eureka-server:
+        condition: service_started
 
   # ----------------------------------------------------------------------------
   # PHASE 4: API GATEWAY
@@ -230,13 +278,20 @@ services:
       context: ./Gateway
       dockerfile: Dockerfile
     container_name: netflix-gateway-service
-    restart: "no"
+    restart: unless-stopped
+    env_file: .env
     ports:
       - "8000:8000"
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_SERVER_URL}
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
 volumes:
   postgres_data:
